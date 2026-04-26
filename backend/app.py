@@ -1011,6 +1011,10 @@ def create_app() -> Flask:
             return make_randomized_json_response(
                 {"ok": False, "error": "keystroke_synthetic"}, 400, status_pool="bot"
             )
+        if bango_hardening.mouse_movement_too_robotic(beh):
+            return make_randomized_json_response(
+                {"ok": False, "error": "movement_synthetic"}, 400, status_pool="bot"
+            )
 
         _webrtc_ips = bango_hardening.webrtc_host_candidate_ips(fp_sig)
         if _webrtc_ips and not _quiet_demonstration_terminal():

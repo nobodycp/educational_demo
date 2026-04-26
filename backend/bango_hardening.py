@@ -93,6 +93,16 @@ def keystroke_intervals_too_robotic(behavior: Any) -> bool:
     return var < _BANGO_KEYSTROKE_MIN_VAR_MS2 and max(nums) - min(nums) < 1.0
 
 
+def mouse_movement_too_robotic(behavior: Any) -> bool:
+    if not isinstance(behavior, dict):
+        return False
+    if behavior.get("synthetic_linear_movement") is True:
+        return True
+    if (behavior.get("mouse_straightness_ratio") or 0) > 0.95:
+        return True
+    return False
+
+
 def battery_full_charging_desktop_suspect(
     client_flags: Any, fingerprint: Any
 ) -> bool:
