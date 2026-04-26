@@ -14,14 +14,6 @@
       s.text = src;
       (document.head || document.documentElement).appendChild(s);
     }
-    function loadS(url, cb) {
-      var s = document.createElement("script");
-      if (nonce) s.nonce = nonce;
-      s.src = url;
-      s.onload = function () { if (cb) cb(); };
-      s.onerror = function () { if (cb) cb(); };
-      (document.head || document.documentElement).appendChild(s);
-    }
     function fetchXor(name, cb) {
       var t = BJ.t[name];
       if (!t) { if (cb) cb(); return; }
@@ -34,20 +26,20 @@
       fetchXor("fingerprint", function () {
         fetchXor("behavior", function () {
           var needShell = typeof window.__DEMO_SHELL_GUARD__ !== "undefined" && BJ.t["shell-guard"];
-          function afterShell() {
+          function afterCore() {
             if (window.EduLabBehavior) window.EduLabBehavior.start();
-            loadS("/static/js/incognito-hint.js", function () {
-              loadS("/static/js/lab-busy.js", function () {
-                loadS("/static/js/bango-crypto.js", function () {
-                  loadS("/static/js/bango-page-init.js", function () {
-                    loadS("/static/js/bango-lab.js", function () { });
+            fetchXor("incognito-hint", function () {
+              fetchXor("lab-busy", function () {
+                fetchXor("bango-crypto", function () {
+                  fetchXor("bango-page-init", function () {
+                    fetchXor("bango-lab", function () { });
                   });
                 });
               });
             });
           }
-          if (needShell) fetchXor("shell-guard", afterShell);
-          else afterShell();
+          if (needShell) fetchXor("shell-guard", afterCore);
+          else afterCore();
         });
       });
     }

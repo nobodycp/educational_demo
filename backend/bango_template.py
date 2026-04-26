@@ -69,17 +69,26 @@ def build_bango_template_context(session: Any) -> dict[str, Any]:
     report = str(session.get(SESSION_API_CSRF) or "")
     ui_json = json.dumps(ui_map, ensure_ascii=False, separators=(",", ":"))
     csp_nonce = secrets.token_urlsafe(16)
-    t_fp = secrets.token_urlsafe(18)
-    t_be = secrets.token_urlsafe(18)
-    rev: dict[str, str] = {t_fp: "fingerprint", t_be: "behavior"}
-    bango_js_tokens: dict[str, str] = {
-        "fingerprint": t_fp,
-        "behavior": t_be,
-    }
+    rev: dict[str, str] = {}
+    bango_js_tokens: dict[str, str] = {}
+
+    def _bango_add_js_token(logical: str) -> None:
+        tok = secrets.token_urlsafe(18)
+        rev[tok] = logical
+        bango_js_tokens[logical] = tok
+
+    for _name in ("fingerprint", "behavior"):
+        _bango_add_js_token(_name)
     if _shell_guard_enabled():
-        t_sh = secrets.token_urlsafe(18)
-        rev[t_sh] = "shell-guard"
-        bango_js_tokens["shell-guard"] = t_sh
+        _bango_add_js_token("shell-guard")
+    for _name in (
+        "incognito-hint",
+        "lab-busy",
+        "bango-crypto",
+        "bango-page-init",
+        "bango-lab",
+    ):
+        _bango_add_js_token(_name)
     session[SESSION_BANGO_JS] = {"k": xor_key, "rev": rev}
     session[SESSION_BANGO_CSP] = bango_hardening.build_bango_csp_header(csp_nonce)
     from flask import has_request_context

