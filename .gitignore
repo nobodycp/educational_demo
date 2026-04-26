@@ -1,0 +1,10 @@
+.env
+__pycache__/
+**/__pycache__/
+*.pyc
+.DS_Store
+.pytest_cache/
+.venv/
+keys_only/private_demo.pem
+data/incidents.db
+data/incidents.db-journal

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% for step in lab_shield_head_order %}
+  {% if step == 0 %}<meta charset="UTF-8">{% elif step == 1 %}<meta name="viewport" content="width=device-width, initial-scale=1">{% elif step == 2 %}<link rel="stylesheet" href="/static/css/lab-theme.css" />{% endif %}
+  {% endfor %}
+  <title>Loading</title>
+  {% if shell_guard %}
+  <script>window.__DEMO_SHELL_GUARD__ = {"enabled": true, "blockedUrl": {{ (gate_blocked_redirect or "")|tojson }}, "reportCsrf": {{ csrf_token|tojson }} };</script>
+  <script src="/static/js/shell-guard.js"></script>
+  {% endif %}
+  <style>
+    .lab-gate-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 1.5rem;
+    }
+    .lab-gate-root {
+      text-align: center;
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+    }
+    .lab-gate-sronly {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    #status.lab-gate-status:empty {
+      display: none;
+    }
+    #status.lab-gate-status:not(:empty) {
+      margin: 1rem 0 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--lab-muted);
+    }
+  </style>
+</head>
+<body class="lab-page">
+  <div class="lab-gate-sronly" data-lab-poly-map="{{ lab_shield_map_json|e }}" data-lab-poly-k="{{ lab_shield_key|e }}" aria-hidden="true">.</div>
+  <div class="select-none" aria-hidden="true">{{ 4|dom_noise }}</div>
+  <div class="lab-gate-screen">
+    <noscript>
+      <p class="lab-muted" style="text-align:center;">JavaScript is required.</p>
+    </noscript>
+    <div id="gateRoot" class="lab-gate-root" data-ui-map="{{ ui_class_map|e }}" data-ui-key="{{ ui_xor_key|e }}">
+      <div class="lab-spinner lab-spinner--block" aria-hidden="true"></div>
+      <span class="lab-gate-sronly">Loading</span>
+      <p id="status" class="lab-gate-status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <script>
+    window.__GATE__ = {
+      csrf: {{ csrf_token|tojson }},
+      powId: {{ pow_id|tojson }},
+      powZeros: {{ pow_zero_hex|tojson }},
+      handshakeNonce: {{ handshake_nonce|tojson }},
+    };
+    window.__DEMO_GATE_HMAC__ = {{ hmac_secret|tojson }};
+  </script>
+  <script src="/static/js/fingerprint.js"></script>
+  <script src="/static/js/behavior.js"></script>
+  <script src="/static/js/incognito-hint.js"></script>
+  <script>
+    /** XOR + base64url decode matching Python `gate_engine.xor_deobfuscate_utf8` (UTF-8 safe). */
+    function xorDeobfuscateUtf8(blob, keyStr) {
+      var key = new TextEncoder().encode(keyStr);
+      if (!key.length) throw new Error("empty xor key");
+      var padLen = (4 - (blob.length % 4)) % 4;
+      var b64 = blob.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat(padLen);
+      var bin = atob(b64);
+      var raw = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+      var out = new Uint8Array(raw.length);
+      for (var j = 0; j < raw.length; j++) out[j] = raw[j] ^ key[j % key.length];
+      return new TextDecoder().decode(out);
+    }
+
+    function applyObfuscatedUiClasses() {
+      var root = document.getElementById("gateRoot");
+      if (!root) return;
+      var mapJson = root.getAttribute("data-ui-map") || "{}";
+      var key = root.getAttribute("data-ui-key") || "";
+      var map = {};
+      try {
+        map = JSON.parse(mapJson);
+      } catch (e) {
+        return;
+      }
+      var el = document.getElementById("status");
+      var obf = map["gate-status"];
+      if (!el || !obf) return;
+      try {
+        el.className = xorDeobfuscateUtf8(obf, key) + " lab-gate-status lab-status";
+      } catch (e2) {}
+    }
+
+    EduLabBehavior.start();
+    applyObfuscatedUiClasses();
+  </script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("status");
+      if (!statusEl) return;
+
+      function fatal(msg) {
+        statusEl.textContent = msg;
+      }
+
+      function sha256Hex(str) {
+        var enc = new TextEncoder();
+        return crypto.subtle.digest("SHA-256", enc.encode(str)).then(function (buf) {
+          var bytes = new Uint8Array(buf);
+          var hex = "";
+          for (var i = 0; i < bytes.length; i++) {
+            hex += ("0" + bytes[i].toString(16)).slice(-2);
+          }
+          return hex;
+        });
+      }
+
+      function solvePow(powId, zeros) {
+        if (!zeros || zeros <= 0) return Promise.resolve(0);
+        var prefix = "";
+        for (var z = 0; z < zeros; z++) prefix += "0";
+        var n = 0;
+        function step() {
+          return sha256Hex(powId + String(n)).then(function (hex) {
+            if (hex.indexOf(prefix) === 0) return n;
+            n++;
+            if (n > 30000000) return Promise.reject(new Error("pow_timeout"));
+            if ((n & 8191) === 0) {
+              return new Promise(function (r) {
+                setTimeout(function () {
+                  r(step());
+                }, 0);
+              });
+            }
+            return step();
+          });
+        }
+        return step();
+      }
+
+      function hmacSha256Hex(secret, message) {
+        var enc = new TextEncoder();
+        return crypto.subtle
+          .importKey(
+            "raw",
+            enc.encode(secret),
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["sign"]
+          )
+          .then(function (key) {
+            return crypto.subtle.sign("HMAC", key, enc.encode(message));
+          })
+          .then(function (buf) {
+            var bytes = new Uint8Array(buf);
+            var hex = "";
+            for (var i = 0; i < bytes.length; i++) {
+              hex += ("0" + bytes[i].toString(16)).slice(-2);
+            }
+            return hex;
+          });
+      }
+
+      function deepSortJson(obj) {
+        if (obj === null || typeof obj !== "object") return obj;
+        if (Array.isArray(obj)) {
+          var arr = [];
+          for (var i = 0; i < obj.length; i++) arr.push(deepSortJson(obj[i]));
+          return arr;
+        }
+        var keys = Object.keys(obj).sort();
+        var out = {};
+        for (var j = 0; j < keys.length; j++) {
+          var k = keys[j];
+          out[k] = deepSortJson(obj[k]);
+        }
+        return out;
+      }
+
+      /** Match Python `json.dumps(..., sort_keys=True, separators=(',', ':'))` for HMAC. */
+      function canonicalPayloadString(obj) {
+        return JSON.stringify(deepSortJson(obj));
+      }
+
+      function normalizeRedirectUrl(redirectUrl) {
+        try {
+          var u = new URL(redirectUrl, window.location.href);
+          u.protocol = window.location.protocol;
+          u.hostname = window.location.hostname;
+          u.port = window.location.port;
+          return u.toString();
+        } catch (e) {
+          return redirectUrl;
+        }
+      }
+
+      function run() {
+        if (!window.crypto || !window.crypto.subtle) {
+          fatal("This browser cannot complete the check.");
+          return;
+        }
+
+        var g = window.__GATE__ || {};
+        var secret = window.__DEMO_GATE_HMAC__ || "";
+
+        var fpFull = window.EduLabFingerprint ? window.EduLabFingerprint.collect() : {};
+        var bhFull = window.EduLabBehavior ? window.EduLabBehavior.snapshot() : {};
+
+        (window.EduLabIncognito && window.EduLabIncognito.detect ? window.EduLabIncognito.detect : function (c) { c(false); })(function (inc) {
+          fpFull.devtools_timing_anomaly = !!window.__EDU_DEVTOOLS_PROBE__ && window.__EDU_DEVTOOLS_PROBE__();
+          fpFull.incognito_storage_hint = inc;
+
+          solvePow(g.powId || "", g.powZeros || 0)
+            .then(function (powNonce) {
+              var bodyObj = {
+                fingerprint_hash: fpFull.fingerprint_hash || "",
+                fingerprint_signals: fpFull,
+                behavior_signals: bhFull,
+                client_flags: { incognito: !!inc },
+                note: "educational_demo_payload",
+                csrf: g.csrf || "",
+                pow_nonce: powNonce,
+                handshake_nonce: g.handshakeNonce || "",
+              };
+              var canonical = canonicalPayloadString(bodyObj);
+              var ts = Math.floor(Date.now() / 1000);
+
+              function sendPayload(payload) {
+                fetch("/p", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: payload,
+                  credentials: "same-origin",
+                })
+                  .then(function (res) {
+                    return res.text().then(function (text) {
+                      return { res: res, text: text };
+                    });
+                  })
+                  .then(function (o) {
+                    var res = o.res;
+                    var text = o.text;
+                    function tryRedirect(urlStr) {
+                      if (!urlStr || typeof urlStr !== "string") return false;
+                      var u = urlStr.trim();
+                      try {
+                        var ext = new URL(u);
+                        if (ext.protocol === "https:" || ext.protocol === "http:") {
+                          window.location.replace(u);
+                          return true;
+                        }
+                      } catch (eRedirect) {}
+                      return false;
+                    }
+                    if (!res.ok) {
+                      var hdr = res.headers.get("X-Edu-Blocked-Redirect");
+                      if (tryRedirect(hdr)) return;
+                    }
+                    var data = {};
+                    try {
+                      data = text ? JSON.parse(text) : {};
+                    } catch (e2) {
+                      data = {};
+                    }
+                    if (res.ok && data.status === "access_granted" && data.redirect_url) {
+                      window.location.href = normalizeRedirectUrl(data.redirect_url);
+                      return;
+                    }
+                    if (!res.ok && tryRedirect(data.redirect_url)) return;
+                    if (!res.ok && data.hint) {
+                      fatal(
+                        (data.hint && String(data.hint)) ||
+                          "Unable to continue."
+                      );
+                      return;
+                    }
+                    if (!res.ok) {
+                      fatal("Unable to continue.");
+                      return;
+                    }
+                    fatal("Unable to continue.");
+                  })
+                  .catch(function (e) {
+                    fatal("Unable to continue.");
+                  });
+              }
+
+              if (secret) {
+                return hmacSha256Hex(secret, ts + "|" + canonical).then(function (sigHex) {
+                  bodyObj.ts = ts;
+                  bodyObj.sig = sigHex;
+                  return new Promise(function (r) {
+                    setTimeout(function () {
+                      sendPayload(JSON.stringify(bodyObj));
+                      r();
+                    }, 400);
+                  });
+                });
+              }
+              return new Promise(function (r) {
+                setTimeout(function () {
+                  sendPayload(JSON.stringify(bodyObj));
+                  r();
+                }, 400);
+              });
+            })
+            .catch(function (e) {
+              fatal("Unable to continue.");
+            });
+        });
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", run);
+      } else {
+        run();
+      }
+    })();
+  </script>
+</body>
+</html>

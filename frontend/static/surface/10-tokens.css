@@ -1,0 +1,28 @@
+/**
+ * Design tokens only (colors, radii, shadows). Change the look by editing this file
+ * or swapping the theme import in `index.css` — not the app JS.
+ */
+.lab-page {
+  --lab-bg-a: #faf7f4;
+  --lab-bg-b: #eef3f8;
+  --lab-card: #ffffff;
+  --lab-text: #3d3834;
+  --lab-muted: #6f6a64;
+  --lab-line: #e8e3dc;
+  --lab-accent: #4d9a8c;
+  --lab-accent-dim: #3d7d72;
+  --lab-warm: #fff5ed;
+  --lab-warm-line: #edd9c8;
+  --lab-ok: #2d8a5e;
+  --lab-deny: #c45c5c;
+  --lab-radius: 20px;
+  --lab-radius-sm: 12px;
+  --lab-shadow: 0 12px 40px rgba(55, 48, 40, 0.06);
+  --lab-font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --lab-input-bg: #fdfcfa;
+  --lab-input-hover: #d8d0c8;
+  --lab-nested-bg: #fdfcfa;
+  --lab-table-head: #f3f0ec;
+  --lab-table-row: #fdfcfa;
+  --lab-code-bg: #f0ebe5;
+}

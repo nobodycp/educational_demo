@@ -1,0 +1,179 @@
+/* Page chrome, layout, form controls — no overlay/MFA (see 30-*.css). */
+.lab-page {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--lab-font);
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--lab-text);
+  background: linear-gradient(165deg, var(--lab-bg-a) 0%, var(--lab-bg-b) 55%, #f5f0eb 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+.lab-shell {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 2.75rem) clamp(1rem, 3vw, 1.5rem) 3rem;
+}
+
+.lab-shell--wide {
+  max-width: 52rem;
+}
+
+.lab-brand {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lab-muted);
+  margin-bottom: 0.35rem;
+}
+
+.lab-title {
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  margin: 0 0 1rem;
+  color: var(--lab-text);
+}
+
+.lab-card {
+  background: var(--lab-card);
+  border-radius: var(--lab-radius);
+  box-shadow: var(--lab-shadow);
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.lab-warn {
+  background: var(--lab-warm);
+  border: 1px solid var(--lab-warm-line);
+  border-radius: var(--lab-radius-sm);
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.92rem;
+  color: var(--lab-muted);
+  line-height: 1.6;
+}
+
+.lab-warn strong {
+  color: var(--lab-text);
+  font-weight: 600;
+}
+
+.lab-muted {
+  color: var(--lab-muted);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.lab-form-divider {
+  border: 0;
+  border-top: 1px dashed var(--lab-line);
+  margin: 1.35rem 0 1.15rem;
+}
+
+.lab-panel {
+  background: var(--lab-card);
+  border-radius: var(--lab-radius);
+  box-shadow: var(--lab-shadow);
+  padding: 1.25rem 1.35rem;
+  margin-top: 1rem;
+  border: 1px solid var(--lab-line);
+}
+
+.lab-card .lab-panel--nested {
+  margin-top: 0.75rem;
+  box-shadow: none;
+  border-style: dashed;
+  background: var(--lab-nested-bg);
+}
+
+#status.lab-status,
+.lab-status,
+.gate-status {
+  font-weight: 600;
+  color: var(--lab-accent-dim);
+  margin: 0 0 0.75rem;
+}
+
+.lab-hint,
+.gate-hint {
+  font-size: 0.88rem;
+  color: var(--lab-muted);
+  margin: 0;
+}
+
+.gate-panel {
+  background: var(--lab-nested-bg);
+  border-radius: var(--lab-radius-sm);
+  padding: 1rem 1.1rem;
+  margin-top: 0.75rem;
+  border: 1px dashed var(--lab-line);
+}
+
+label.lab-field {
+  display: block;
+  margin-top: 1rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--lab-text);
+}
+
+label.lab-field:first-of-type {
+  margin-top: 0;
+}
+
+.lab-field input,
+.lab-field select {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem 0.85rem;
+  font-family: inherit;
+  font-size: 1rem;
+  border: 1px solid var(--lab-line);
+  border-radius: 12px;
+  background: var(--lab-input-bg);
+  color: var(--lab-text);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lab-field input:hover,
+.lab-field select:hover {
+  border-color: var(--lab-input-hover);
+}
+
+.lab-field input:focus,
+.lab-field select:focus {
+  outline: none;
+  border-color: var(--lab-accent);
+  box-shadow: 0 0 0 3px rgba(77, 154, 140, 0.2);
+}
+
+.lab-btn {
+  margin-top: 1.35rem;
+  padding: 0.7rem 1.5rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--lab-accent);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(77, 154, 140, 0.35);
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.lab-btn:hover {
+  background: var(--lab-accent-dim);
+  box-shadow: 0 6px 18px rgba(77, 154, 140, 0.4);
+}
+
+.lab-btn:active {
+  transform: scale(0.98);
+}

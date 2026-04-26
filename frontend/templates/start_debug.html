@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gate debug</title>
+  <link rel="stylesheet" href="/static/css/lab-theme.css" />
+  <link rel="stylesheet" href="/static/css/lab-debug-only.css" />
+</head>
+<body class="lab-page lab-debug-dark dbg-page">
+  <div class="dbg-shell">
+    <header class="dbg-head">
+      <div class="dbg-head-row">
+        <span class="dbg-brand">Lab · gate debug</span>
+        <a class="dbg-link" href="/start">← /start</a>
+      </div>
+      <p class="dbg-sub">Secret URL: <code class="dbg-code">/start?test={{ debug_key }}</code></p>
+    </header>
+
+    <div class="dbg-grid-top">
+      <section class="dbg-card" aria-labelledby="dbg-sec-ip">
+        <h2 id="dbg-sec-ip" class="dbg-sec-title">IP &amp; redirect</h2>
+        <table class="dbg-kv">
+          <tr><th>Client IP</th><td><code class="dbg-code">{{ client_ip }}</code></td></tr>
+          <tr><th>Blocked redirect</th><td>{% if gate_blocked_redirect %}<code class="dbg-code dbg-code--break" title="{{ gate_blocked_redirect }}">{{ gate_blocked_redirect }}</code>{% else %}<span class="dbg-muted">(unset · <code>DEMO_GATE_BLOCKED_REDIRECT_URL</code>)</span>{% endif %}</td></tr>
+          <tr><th>Lifetime quota</th><td><span class="{% if gate_quota.exhausted %}dbg-bad{% else %}dbg-good{% endif %}">{{ gate_quota.current }}</span> / {{ gate_quota.max }} <span class="dbg-muted">(passes + external-guard denies)</span> {% if gate_quota.exhausted %}<span class="dbg-bad">· cap hit</span>{% endif %}</td></tr>
+          <tr><th>SQLite totals</th><td>ok <strong>{{ lifetime.allowed }}</strong> · deny <strong>{{ lifetime.denied }}</strong> · rows <strong>{{ lifetime.total }}</strong></td></tr>
+        </table>
+      </section>
+
+      <section class="dbg-card" aria-labelledby="dbg-sec-rate">
+        <h2 id="dbg-sec-rate" class="dbg-sec-title">Rate limit (RAM)</h2>
+        <table class="dbg-kv">
+          <tr><th>Source</th><td><code class="dbg-code">{{ rate.rate_source }}</code></td></tr>
+          <tr><th>Window</th><td>{{ rate.window_seconds }}s · max {{ rate.max_hits_per_window }}/window</td></tr>
+          <tr><th>In window</th><td><strong>{{ rate.post_attempts_in_current_window }}</strong> / {{ rate.max_hits_per_window }}</td></tr>
+          <tr><th>Next POST → 429?</th><td class="{% if rate.would_block_next_post %}dbg-bad{% else %}dbg-good{% endif %}">{% if rate.would_block_next_post %}yes{% else %}no{% endif %}</td></tr>
+          {% if rate.window_resets_epoch_approx %}
+          <tr><th>Reset ~epoch</th><td><code class="dbg-code">{{ rate.window_resets_epoch_approx }}</code></td></tr>
+          {% endif %}
+        </table>
+      </section>
+
+      <section class="dbg-card" aria-labelledby="dbg-sec-ext">
+        <h2 id="dbg-sec-ext" class="dbg-sec-title">External guard</h2>
+        <p class="dbg-micro"><code>DEMO_EXTERNAL_GUARD</code>: <code>on|true|1|yes</code> = POST on. {% if external_guard.dotenv_hot_reload %}Re-read from <code>.env</code> each request.{% endif %}</p>
+        <table class="dbg-kv">
+          <tr><th><code>DEMO_EXTERNAL_GUARD</code></th><td><code class="dbg-code">{{ external_guard.guard_env_live }}</code></td></tr>
+          <tr><th>State</th><td class="{% if external_guard.guard_state == 'on' %}dbg-good{% else %}dbg-bad{% endif %}">{{ external_guard.guard_state }}</td></tr>
+          <tr><th>URL / key set</th><td>{% if external_guard.url_configured %}yes{% else %}no{% endif %} / {% if external_guard.api_key_configured %}yes{% else %}no{% endif %}</td></tr>
+          <tr><th>Will POST /p</th><td class="{% if external_guard.will_post_to_remote %}dbg-good{% else %}dbg-bad{% endif %}"><strong>{% if external_guard.will_post_to_remote %}yes{% else %}no{% endif %}</strong></td></tr>
+        </table>
+      </section>
+    </div>
+
+    <div class="dbg-stack">
+      <section class="dbg-card" aria-labelledby="dbg-sec-ua">
+        <h2 id="dbg-sec-ua" class="dbg-sec-title">User-Agent (heuristic)</h2>
+        <table class="dbg-kv dbg-kv--tight">
+          <tr><th>Device</th><td>{{ ua_details.device_kind }}</td></tr>
+          <tr><th>OS</th><td>{{ ua_details.os_family }}{% if ua_details.os_version %} <code class="dbg-code">{{ ua_details.os_version }}</code>{% endif %}</td></tr>
+          <tr><th>Browser</th><td>{{ ua_details.browser_family }}{% if ua_details.browser_version %} <code class="dbg-code">{{ ua_details.browser_version }}</code>{% endif %}</td></tr>
+          <tr><th>Engine</th><td>{{ ua_details.engine or "—" }}</td></tr>
+          <tr><th>Mobile / tablet</th><td>{{ ua_details.is_mobile_hint }} / {{ ua_details.is_tablet_hint }}</td></tr>
+          <tr><th>Platform token</th><td><code class="dbg-code dbg-code--break">{{ ua_details.platform_token or "—" }}</code></td></tr>
+          {% if ua_details.embeddings %}
+          <tr><th>IDE / embed</th><td class="dbg-code dbg-code--break">{{ ua_details.embeddings | join(", ") }}</td></tr>
+          {% endif %}
+          <tr><th>UA length</th><td>{{ ua_details.raw_full_length }} chars</td></tr>
+          <tr><th>Header</th><td><code class="dbg-code dbg-code--break" title="{{ user_agent|e }}">{% if user_agent|length > 160 %}{{ user_agent[:160] }}...{% else %}{{ user_agent }}{% endif %}</code></td></tr>
+        </table>
+        {% if ua_details.raw %}
+        <div class="dbg-ua-box" title="Truncated for display">
+          <span class="dbg-ua-label">raw (truncated)</span>
+          <pre class="dbg-ua-pre">{{ ua_details.raw }}</pre>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="dbg-card" aria-labelledby="dbg-sec-audit">
+        <div class="dbg-audit-head">
+          <h2 id="dbg-sec-audit" class="dbg-sec-title">Gate audit (last {{ rows|length }} rows)</h2>
+          <span class="dbg-pill">shown: ok {{ counts.allowed }} · deny {{ counts.denied }} · total {{ counts.total }}</span>
+        </div>
+        <div class="dbg-table-wrap">
+          <table class="dbg-table">
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>time</th>
+                <th>res</th>
+                <th>reason</th>
+                <th>phase</th>
+                <th>risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+              <tr>
+                <td class="dbg-num">{{ r.id }}</td>
+                <td><code class="dbg-code">{{ "%.3f"|format(r.created_at) }}</code></td>
+                <td class="{% if r.allowed %}dbg-good{% else %}dbg-bad{% endif %}">{% if r.allowed %}ok{% else %}no{% endif %}</td>
+                <td>
+                  {% if r.reason == "external_guard_denied" and r.risk is mapping %}
+                    {% set ext = (r.risk.get("external_reason") or r.risk.get("reason") or "")|trim %}
+                    <code class="dbg-code dbg-reason" title="external_guard_denied">{{ ext or "denied" }}</code>
+                  {% else %}
+                    <code class="dbg-code dbg-reason">{{ r.reason or "—" }}</code>
+                  {% endif %}
+                </td>
+                <td class="dbg-muted">{{ r.phase or "—" }}</td>
+                <td class="dbg-num">{% if r.risk is mapping %}{{ r.risk.get("score", "—") }}{% else %}—{% endif %}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="dbg-empty">No rows for this IP.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="dbg-foot">After Origin check. Examples: <code>rate_limit</code>, <code>lifetime_ip_cap</code>, <code>external_guard_denied</code>, <code>bad_csrf</code>, <code>bad_pow</code>, <code>shell_guard_devtools</code> (client report before redirect; see <code>risk.subreason</code>).</p>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

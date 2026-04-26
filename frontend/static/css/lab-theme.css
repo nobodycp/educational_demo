@@ -1,0 +1,6 @@
+/**
+ * Public entry: templates keep linking to /static/css/lab-theme.css.
+ * All look-and-feel lives in ../surface/ (split tokens + pages + components).
+ * @see ../surface/README.txt
+ */
+@import url("../surface/index.css");
