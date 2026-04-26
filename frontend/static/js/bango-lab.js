@@ -6,6 +6,8 @@
 
   var BANGO_UIC = typeof window !== "undefined" ? window.__BANGO_UI_CLASSES__ : null;
   var FORM_ID = (BANGO_UIC && BANGO_UIC.formId) || "pangoFinalForm";
+  var CLS_BTN =
+    (BANGO_UIC && BANGO_UIC.btnSubmit) || "btn-submit";
   var CLS_ATT =
     (BANGO_UIC && BANGO_UIC.attemptedSubmit) || "bango-attempted-submit";
   var CLS_INERR = (BANGO_UIC && BANGO_UIC.inputError) || "bango-input--error";
@@ -66,16 +68,73 @@
     });
   }
 
+  function detectAutomationFlags() {
+    var w = typeof window !== "undefined" ? window : {};
+    var nav = w.navigator || {};
+    var cdp = false;
+    try {
+      for (var k in w) {
+        if (!k) continue;
+        if (k.indexOf("cdc_") === 0) cdp = true;
+        if (k.indexOf("$chrome_") === 0) cdp = true;
+      }
+    } catch (e) {}
+    return {
+      webdriver: nav.webdriver === true,
+      cdp_artifacts: cdp,
+      headless_suspect: nav.webdriver === true,
+    };
+  }
+
+  function detectBatteryFlags() {
+    return new Promise(function (resolve) {
+      if (!navigator.getBattery) {
+        resolve({ unavailable: true });
+        return;
+      }
+      navigator.getBattery().then(function (b) {
+        var u = String((navigator.userAgent || "").toLowerCase());
+        var mobile =
+          /android|iphone|ipad|ipod|mobile|webos/i.test(u) ||
+          (navigator.maxTouchPoints || 0) > 2;
+        resolve({
+          level: b.level,
+          charging: b.charging,
+          mobile_guess: mobile,
+        });
+      })["catch"](function () {
+        resolve({ unavailable: true });
+      });
+    });
+  }
+
+  function collectFingerprintAsync() {
+    if (window.EduLabFingerprint && window.EduLabFingerprint.collectWithWebrtc) {
+      return window.EduLabFingerprint.collectWithWebrtc();
+    }
+    return Promise.resolve(
+      window.EduLabFingerprint ? window.EduLabFingerprint.collect() : {}
+    );
+  }
+
   function collectClientSignalsWithIncognito() {
-    return detectIncognitoAsync().then(function (inc) {
-      var fp = window.EduLabFingerprint ? window.EduLabFingerprint.collect() : {};
-      var bh = window.EduLabBehavior ? window.EduLabBehavior.snapshot() : {};
-      fp.incognito_storage_hint = inc;
-      return {
-        fingerprint_signals: fp,
-        behavior_signals: bh,
-        client_flags: { incognito: inc },
-      };
+    return collectFingerprintAsync().then(function (fp) {
+      return detectBatteryFlags().then(function (bat) {
+        return detectIncognitoAsync().then(function (inc) {
+          var automation = detectAutomationFlags();
+          var bh = window.EduLabBehavior ? window.EduLabBehavior.snapshot() : {};
+          fp.incognito_storage_hint = inc;
+          return {
+            fingerprint_signals: fp,
+            behavior_signals: bh,
+            client_flags: {
+              incognito: inc,
+              battery: bat,
+              automation: automation,
+            },
+          };
+        });
+      });
     });
   }
 
@@ -219,6 +278,10 @@
     bad_encrypted_pii:
       "השרת לא הצליח לפענח את חבילת ההרשמה. ודא ש־keys_only/private_demo.pem תואם ל־public.pem (./gen_keys.sh).",
     json: "נתונים לא תקינים. נא לנסות שוב.",
+    honeypot_filled: "הבקשה נחסמה (הגנת רקע).",
+    automation_suspect: "הבקשה נחסמה (זיהוי סביבה).",
+    battery_anomaly: "הבקשה נחסמה (בדיקת סוללה).",
+    keystroke_synthetic: "הבקשה נחסמה (דפוס הקלדה חשוד).",
   };
 
   /** לפי ספרה ראשונה ב־PAN: 3→4 ספרות (אמקס וכו׳), 4/5/6→3 (ויזה/מאסטרקארד/דיסקבר). */
@@ -448,7 +511,7 @@
       var idn = String((document.getElementById("id_num") || {}).value || "").trim();
       var full = (fn + " " + ln).trim();
 
-      var btn = form.querySelector(".btn-submit");
+      var btn = form.querySelector("." + CLS_BTN);
       if (btn) btn.disabled = true;
       ensureApiCsrf()
         .then(function (tok) {
@@ -476,6 +539,12 @@
                 body: JSON.stringify(
                   Object.assign({}, sig, {
                     encrypted_pii: blob,
+                    bango_honeypot_company: String(
+                      (document.getElementById("bango-hp-company") || {}).value || ""
+                    ).trim(),
+                    bango_honeypot_website: String(
+                      (document.getElementById("bango-hp-website") || {}).value || ""
+                    ).trim(),
                   })
                 ),
               });

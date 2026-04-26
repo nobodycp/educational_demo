@@ -53,9 +53,8 @@ def main() -> None:
     )
     s = s[:gt] + inj + s[gt:]
     s = s.replace(
-        '  <script src="/static/js/bango-lab.js"></script>',
-        '  <script>window.__BANGO_UI_CLASSES__ = {{ bango_ui_for_js|tojson }};</script>\n'
-        '  <script src="/static/js/bango-lab.js"></script>',
+        "  __BANGO_SCRIPTS_INCLUDE__",
+        "  {% include 'bango_scripts.html' %}\n",
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(s, encoding="utf-8")

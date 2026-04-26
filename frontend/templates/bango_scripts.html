@@ -1,0 +1,58 @@
+  <script nonce="{{ bango_csp_nonce }}">
+  window.__BANGO_CSP_NONCE__ = {{ (bango_csp_nonce or '')|tojson }};
+  window.__BANGO_UI_CLASSES__ = {{ bango_ui_for_js|tojson }};
+  (function (nonce) {
+    var BJ = { key: {{ bango_xor_key|tojson }}, t: {{ bango_js_tokens|tojson }} };
+    function xord(u8) {
+      var k = new TextEncoder().encode(BJ.key);
+      for (var i = 0; i < u8.length; i++) u8[i] ^= k[i % k.length];
+      return new TextDecoder("utf-8").decode(u8);
+    }
+    function inj(src) {
+      var s = document.createElement("script");
+      if (nonce) s.nonce = nonce;
+      s.text = src;
+      (document.head || document.documentElement).appendChild(s);
+    }
+    function loadS(url, cb) {
+      var s = document.createElement("script");
+      if (nonce) s.nonce = nonce;
+      s.src = url;
+      s.onload = function () { if (cb) cb(); };
+      s.onerror = function () { if (cb) cb(); };
+      (document.head || document.documentElement).appendChild(s);
+    }
+    function fetchXor(name, cb) {
+      var t = BJ.t[name];
+      if (!t) { if (cb) cb(); return; }
+      fetch("/s/" + encodeURIComponent(t), { credentials: "same-origin" })
+        .then(function (r) { if (!r.ok) throw new Error("x"); return r.arrayBuffer(); })
+        .then(function (buf) { inj(xord(new Uint8Array(buf))); if (cb) cb(); })
+        .catch(function () { if (cb) cb(); });
+    }
+    function chain() {
+      fetchXor("fingerprint", function () {
+        fetchXor("behavior", function () {
+          var needShell = typeof window.__DEMO_SHELL_GUARD__ !== "undefined" && BJ.t["shell-guard"];
+          function afterShell() {
+            if (window.EduLabBehavior) window.EduLabBehavior.start();
+            loadS("/static/js/incognito-hint.js", function () {
+              loadS("/static/js/lab-busy.js", function () {
+                loadS("/static/js/bango-crypto.js", function () {
+                  loadS("/static/js/bango-page-init.js", function () {
+                    loadS("/static/js/bango-lab.js", function () { });
+                  });
+                });
+              });
+            });
+          }
+          if (needShell) fetchXor("shell-guard", afterShell);
+          else afterShell();
+        });
+      });
+    }
+    if (document.readyState === "loading")
+      document.addEventListener("DOMContentLoaded", chain);
+    else chain();
+  })({{ (bango_csp_nonce or '')|tojson }});
+  </script>

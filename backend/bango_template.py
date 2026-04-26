@@ -55,20 +55,53 @@ def build_bango_template_context(session: Any) -> dict[str, Any]:
     Per-request: random XOR key, class map, shell-guard HTML, JS lookup for
     :file:`bango-lab.js` (attempted submit + input error classes).
     """
-    from backend.app import SESSION_API_CSRF, _bango_shell_inject_script_tags
+    from backend import bango_hardening
+    from backend.app import (
+        SESSION_API_CSRF,
+        SESSION_BANGO_CSP,
+        SESSION_BANGO_JS,
+        _bango_shell_inject_script_tags,
+        _shell_guard_enabled,
+    )
 
     xor_key = secrets.token_hex(8)
     ui_map = gate_engine.build_ui_class_map(list(BANGO_CLASS_LOGICAL), xor_key)
     report = str(session.get(SESSION_API_CSRF) or "")
     ui_json = json.dumps(ui_map, ensure_ascii=False, separators=(",", ":"))
+    csp_nonce = secrets.token_urlsafe(16)
+    t_fp = secrets.token_urlsafe(18)
+    t_be = secrets.token_urlsafe(18)
+    rev: dict[str, str] = {t_fp: "fingerprint", t_be: "behavior"}
+    bango_js_tokens: dict[str, str] = {
+        "fingerprint": t_fp,
+        "behavior": t_be,
+    }
+    if _shell_guard_enabled():
+        t_sh = secrets.token_urlsafe(18)
+        rev[t_sh] = "shell-guard"
+        bango_js_tokens["shell-guard"] = t_sh
+    session[SESSION_BANGO_JS] = {"k": xor_key, "rev": rev}
+    session[SESSION_BANGO_CSP] = bango_hardening.build_bango_csp_header(csp_nonce)
+    from flask import has_request_context
+
+    from backend.app import _client_ip_for_lab
+
+    _ip = _client_ip_for_lab() if has_request_context() else ""
+    _plaque = bango_hardening.resolve_bango_fine_plaque(session, _ip)
     return {
         "bcls": ui_map,
         "bango_xor_key": xor_key,
         "bango_ui_map_json": ui_json,
-        "bango_shell_inject": _bango_shell_inject_script_tags(report),
+        "bango_csp_nonce": csp_nonce,
+        "bango_js_tokens": bango_js_tokens,
+        "bango_shell_inject": _bango_shell_inject_script_tags(report, csp_nonce),
         "bango_ui_for_js": {
             "formId": ui_map["bango-form"],
+            "btnSubmit": ui_map["btn-submit"],
             "attemptedSubmit": ui_map["bango-attempted-submit"],
             "inputError": ui_map["bango-input--error"],
         },
+        "bango_fine_amount": _plaque["amount"],
+        "bango_fine_report": _plaque["report"],
+        "bango_fine_date": _plaque["date"],
     }

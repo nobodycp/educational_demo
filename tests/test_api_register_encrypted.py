@@ -50,9 +50,19 @@ class TestApiRegisterEncrypted(unittest.TestCase):
             data=json.dumps(
                 {
                     "encrypted_pii": self._blob,
+                    "bango_honeypot_company": "",
+                    "bango_honeypot_website": "",
                     "fingerprint_signals": {},
                     "behavior_signals": {},
-                    "client_flags": {"incognito": False},
+                    "client_flags": {
+                        "incognito": False,
+                        "battery": {"unavailable": True},
+                        "automation": {
+                            "webdriver": False,
+                            "cdp_artifacts": False,
+                            "headless_suspect": False,
+                        },
+                    },
                 }
             ),
             content_type="application/json",

@@ -32,7 +32,9 @@ class TestShellGuard(unittest.TestCase):
             out = app_mod._bango_inject_shell_guard(raw, "csrf-for-bango")
         self.assertNotIn("__DEMO_BANGO_SHELL_INJECT__", out)
         self.assertIn("https://example.com/away", out)
-        self.assertIn("shell-guard.js", out)
+        # shell-guard.js is loaded via XOR ``/s/<token>`` from Bango, not a direct static path.
+        self.assertNotIn("/static/js/shell-guard.js", out)
+        self.assertIn("<script", out)
         self.assertIn('"enabled"', out)
         self.assertIn("true", out)
         self.assertIn("blockedUrl", out)

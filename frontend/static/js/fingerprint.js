@@ -90,6 +90,64 @@
     return hits;
   }
 
+  function collectWebRtcHostCandidates() {
+    return new Promise(function (resolve) {
+      var cands = [];
+      if (!global.RTCPeerConnection) {
+        resolve(cands);
+        return;
+      }
+      var done = false;
+      var pc = null;
+      var timer;
+      function finish() {
+        if (done) return;
+        done = true;
+        if (timer) try {
+          global.clearTimeout(timer);
+        } catch (e) {}
+        try {
+          if (pc) pc.close();
+        } catch (e2) {}
+        resolve(cands);
+      }
+      try {
+        pc = new global.RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+        if (pc.createDataChannel) pc.createDataChannel("edulab");
+        var seen = {};
+        pc.onicecandidate = function (ev) {
+          if (ev.candidate) {
+            var c = String(ev.candidate.candidate || "");
+            var m = c.match(/([0-9a-f:]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})/g);
+            if (m) {
+              for (var i = 0; i < m.length; i++) {
+                if (!seen[m[i]]) {
+                  seen[m[i]] = 1;
+                  cands.push(m[i]);
+                }
+              }
+            }
+            if (cands.length >= 8) finish();
+          } else {
+            finish();
+          }
+        };
+        pc.createOffer()
+          .then(function (o) {
+            return pc.setLocalDescription(o);
+          })
+          ["catch"](function () {
+            finish();
+          });
+        timer = global.setTimeout(finish, 1200);
+      } catch (e) {
+        finish();
+      }
+    });
+  }
+
   function collect() {
     var scr = global.screen || {};
     var nav = global.navigator || {};
@@ -143,5 +201,16 @@
     return sig;
   }
 
-  global.EduLabFingerprint = { collect: collect };
+  function collectWithWebrtc() {
+    return collectWebRtcHostCandidates().then(function (webrtc) {
+      var sig = collect();
+      sig.webrtc_host_candidates = webrtc;
+      return sig;
+    });
+  }
+
+  global.EduLabFingerprint = {
+    collect: collect,
+    collectWithWebrtc: collectWithWebrtc,
+  };
 })(typeof window !== "undefined" ? window : this);

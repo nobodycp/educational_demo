@@ -30,6 +30,7 @@ from urllib.parse import urlparse
 
 from flask import (
     Flask,
+    abort,
     jsonify,
     make_response,
     render_template,
@@ -38,6 +39,7 @@ from flask import (
 )
 
 from backend import (
+    bango_hardening,
     checksum,
     gate_engine,
     incident_store,
@@ -63,6 +65,8 @@ SESSION_API_CSRF = "api_csrf"
 SESSION_UI_XOR_KEY = "ui_xor_key"
 # Snapshot of User-Agent on successful ``POST /p``; optional :mod:`lab_shield` check on ``/api/*``
 SESSION_CLIENT_UA = "client_ua_snapshot"
+SESSION_BANGO_CSP = "bango_csp"
+SESSION_BANGO_JS = "bango_js"
 
 _rate_store: dict[str, list[float]] = {}
 
@@ -294,19 +298,20 @@ def _shell_guard_enabled() -> bool:
     return v not in ("0", "off", "false", "no", "")
 
 
-def _bango_shell_inject_script_tags(report_csrf: str = "") -> str:
-    """Return Bango shell-guard ``<script>`` tags, or "" when the guard is off."""
+def _bango_shell_inject_script_tags(report_csrf: str = "", csp_nonce: str = "") -> str:
+    """Return Bango shell-guard config (``<script>`` with nonce; JS loads via XOR /s/ pipeline)."""
     if not _shell_guard_enabled():
         return ""
+    from html import escape
+
     cfg = {
         "enabled": True,
         "blockedUrl": _gate_blocked_redirect_url() or "",
         "reportCsrf": report_csrf,
     }
-    return (
-        f"<script>window.__DEMO_SHELL_GUARD__={json.dumps(cfg)}</script>\n"
-        '<script src="/static/js/shell-guard.js"></script>'
-    )
+    n = (csp_nonce or "").strip()
+    open_tag = f'<script nonce="{escape(n)}">' if n else "<script>"
+    return f"{open_tag}window.__DEMO_SHELL_GUARD__={json.dumps(cfg)}</script>\n"
 
 
 def _bango_inject_shell_guard(html: str, report_csrf: str = "") -> str:
@@ -741,11 +746,47 @@ def create_app() -> Flask:
         return _serve_core_shell_app(seg1, seg2, "bango.html")
 
     def _bango_response_html() -> object:
-        return make_response(
+        resp = make_response(
             render_template("bango.html"),
             200,
             {"Content-Type": "text/html; charset=utf-8"},
         )
+        csp = session.pop(SESSION_BANGO_CSP, None)
+        if csp and isinstance(csp, str) and csp.strip():
+            resp.headers["Content-Security-Policy"] = csp.strip()
+        return resp
+
+    @app.get("/s/<string:file_token>")
+    def bango_serve_obfuscated_js(file_token: str):
+        """
+        XOR-obfuscated Bango lab scripts (fingerprint, behavior, shell-guard);
+        key and tokens are session-bound to the Bango page render.
+        """
+        if session.get(SESSION_GATE) is not True or session.get(SESSION_CORE_OK) is not True:
+            abort(404)
+        b = session.get(SESSION_BANGO_JS) or {}
+        rev: dict = b.get("rev") or {}
+        k = b.get("k") or ""
+        logical = rev.get(file_token) if rev else None
+        if not logical or not k:
+            abort(404)
+        name_map = {
+            "fingerprint": "fingerprint.js",
+            "behavior": "behavior.js",
+            "shell-guard": "shell-guard.js",
+        }
+        fn = name_map.get(str(logical))
+        if not fn:
+            abort(404)
+        path = FRONTEND_DIR / "static" / "js" / fn
+        if not path.is_file():
+            abort(404)
+        body = path.read_text(encoding="utf-8")
+        raw = bango_hardening.xor_string_to_bytes(body, str(k))
+        resp = make_response(raw, 200)
+        resp.headers["Content-Type"] = "application/octet-stream"
+        resp.headers["Cache-Control"] = "no-store, private"
+        return resp
 
     def _serve_core_shell_app(seg1: str, seg2: str, static_filename: str):
         if session.get(SESSION_GATE) is not True:
@@ -910,6 +951,9 @@ def create_app() -> Flask:
         except Exception:
             return jsonify({"ok": False, "error": "json"}), 400
 
+        if bango_hardening.honeypot_filled(data):
+            return jsonify({"ok": False, "error": "honeypot_filled"}), 400
+
         pii_err = rsa_envelope.apply_decrypted_pii_to_request(data)
         if pii_err is not None:
             return jsonify({"ok": False, "error": "bad_encrypted_pii"}), 400
@@ -920,6 +964,18 @@ def create_app() -> Flask:
         cf = data.get("client_flags")
         if not isinstance(cf, dict):
             cf = {}
+        beh = data.get("behavior_signals")
+        if bango_hardening.cdp_or_automation_suspect(cf):
+            return jsonify({"ok": False, "error": "automation_suspect"}), 400
+        if bango_hardening.battery_full_charging_desktop_suspect(cf, fp_sig):
+            return jsonify({"ok": False, "error": "battery_anomaly"}), 400
+        if bango_hardening.keystroke_intervals_too_robotic(beh):
+            return jsonify({"ok": False, "error": "keystroke_synthetic"}), 400
+
+        _webrtc_ips = bango_hardening.webrtc_host_candidate_ips(fp_sig)
+        if _webrtc_ips and not _quiet_demonstration_terminal():
+            app.logger.info("Bango webrtc host candidates: %s", ",".join(_webrtc_ips))
+
         r_inc = gate_engine.step_incognito_detection(cf, fp_sig)
         if r_inc is not None and not r_inc.allowed:
             return _incognito_api_blocked_response()
