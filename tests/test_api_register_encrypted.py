@@ -25,12 +25,12 @@ class TestApiRegisterEncrypted(unittest.TestCase):
         self.addCleanup(self._p_env.stop)
         self._blob = encrypt_envelope_json(
             {
-                "fname": "A",
-                "lname": "B",
-                "phone": "1",
+                "fname": "Ab",
+                "lname": "Cd",
+                "phone": "0501234567",
                 "email": "a@b.c",
-                "personal_id": "12",
-                "full_name": "A B",
+                "personal_id": "123456789",
+                "full_name": "Ab Cd",
                 "cc": "4111111111111111",
                 "exp": "12/30",
                 "cvv": "123",

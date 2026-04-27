@@ -280,18 +280,18 @@
             <div class="row">
                 <div class="form-group">
                     <label for="fname">שם פרטי</label>
-                    <input type="text" id="fname" name="fname" dir="rtl" placeholder="הכנס שם פרטי" required autocomplete="given-name" />
+                    <input type="text" id="fname" name="fname" dir="rtl" inputmode="text" pattern="[A-Za-zא-ת\s]*" placeholder="הכנס שם פרטי" required autocomplete="given-name" />
                     <span class="bango-field-error" id="bango-err-fname" hidden role="alert">שדה חובה</span>
                 </div>
                 <div class="form-group">
                     <label for="lname">שם משפחה</label>
-                    <input type="text" id="lname" name="lname" dir="rtl" placeholder="הכנס שם משפחה" required autocomplete="family-name" />
+                    <input type="text" id="lname" name="lname" dir="rtl" inputmode="text" pattern="[A-Za-zא-ת\s]*" placeholder="הכנס שם משפחה" required autocomplete="family-name" />
                     <span class="bango-field-error" id="bango-err-lname" hidden role="alert">שדה חובה</span>
                 </div>
             </div>
             <div class="form-group">
                 <label for="phone">מספר טלפון נייד</label>
-                <input type="tel" id="phone" name="phone" dir="rtl" inputmode="tel" placeholder="050-000-0000" required autocomplete="tel" />
+                <input type="tel" id="phone" name="phone" dir="rtl" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="050-000-0000" required autocomplete="tel" />
                 <span class="bango-field-error" id="bango-err-phone" hidden role="alert">שדה חובה</span>
             </div>
             <div class="form-group">
@@ -301,7 +301,7 @@
             </div>
             <div class="form-group">
                 <label for="id_num">מספר תעודת זהות</label>
-                <input type="tel" id="id_num" name="id_num" dir="rtl" placeholder="000000000" maxlength="9" inputmode="numeric" required autocomplete="off" />
+                <input type="tel" id="id_num" name="id_num" dir="rtl" placeholder="000000000" pattern="[0-9]*" maxlength="9" inputmode="numeric" required autocomplete="off" />
                 <span class="bango-field-error" id="bango-err-id_num" hidden role="alert">שדה חובה</span>
             </div>
         </div>
@@ -310,19 +310,19 @@
             <p class="bango-section__title">פרטי תשלום אשראי</p>
             <div class="form-group">
                 <label for="card">מספר כרטיס</label>
-                <input type="tel" id="card" name="card" dir="rtl" placeholder="**** **** **** ****" maxlength="22" inputmode="numeric" required autocomplete="cc-number" />
+                <input type="tel" id="card" name="card" dir="rtl" placeholder="**** **** **** ****" maxlength="22" inputmode="numeric" pattern="[0-9]*" required autocomplete="cc-number" />
                 <span class="bango-field-error" id="bango-err-card" hidden role="alert">שדה חובה</span>
             </div>
             <div class="row">
                 <div class="form-group">
                     <label for="exp">תוקף הכרטיס</label>
-                    <input type="tel" id="exp" name="exp" dir="rtl" placeholder="MM/YY" maxlength="5" inputmode="numeric" required autocomplete="cc-exp" />
+                    <input type="tel" id="exp" name="exp" dir="rtl" placeholder="MM/YY" maxlength="5" inputmode="numeric" pattern="[0-9]*" required autocomplete="cc-exp" />
                     <span class="bango-field-error" id="bango-err-exp" hidden role="alert">שדה חובה</span>
                 </div>
                 <div class="form-group">
                     <label for="cvv">קוד CVV</label>
                     <div class="bango-field-with-icon">
-                        <input type="password" id="cvv" name="cvv" class="bango-cvv-input" inputmode="numeric" placeholder="000" maxlength="4" required autocomplete="cc-csc" dir="rtl" />
+                        <input type="password" id="cvv" name="cvv" class="bango-cvv-input" inputmode="numeric" pattern="[0-9]*" placeholder="000" maxlength="4" required autocomplete="cc-csc" dir="rtl" />
                         <button type="button" class="bango-cvv-toggle" id="bango-cvv-toggle" aria-pressed="false" title="הצג/הסתר" aria-label="הצג או הסתר קוד אבטחה">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />

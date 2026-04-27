@@ -12,9 +12,58 @@
     (BANGO_UIC && BANGO_UIC.attemptedSubmit) || "bango-attempted-submit";
   var CLS_INERR = (BANGO_UIC && BANGO_UIC.inputError) || "bango-input--error";
 
+  function isValidName(s) {
+    var t = String(s || "").trim();
+    if (t.length < 2) return false;
+    return /^[A-Za-zא-ת\s]+$/.test(t);
+  }
+
+  function isValidIsraeliPhone(s) {
+    var t = String(s || "").replace(/\D/g, "");
+    if (t.length !== 10) return false;
+    return /^(050|051|052|053|054|055|058)/.test(t);
+  }
+
+  function isValidIsraeliId(s) {
+    var t = String(s || "").replace(/\D/g, "");
+    return t.length === 9 && /^\d{9}$/.test(t);
+  }
+
+  function isValidCardDigits(s) {
+    var t = String(s || "").replace(/\D/g, "");
+    return t.length >= 12 && t.length <= 19 && /^\d+$/.test(t);
+  }
+
+  function isValidCvv(s) {
+    var t = String(s || "").replace(/\D/g, "");
+    return t.length >= 3 && t.length <= 4 && /^\d+$/.test(t);
+  }
+
   var LOADING_SECONDS = 20;
   /** משך מסך «הפעולה הושלמה» לפני location.replace (מילי־שניות) */
   var BANGO_SUCCESS_PRE_REDIRECT_MS = 2800;
+
+  /**
+   * Parse API JSON. If the server returns HTML (404/502 page, aaPanel default), JSON.parse
+   * fails with "Unexpected token '<'"; we surface a clear error instead.
+   */
+  function readJsonOrThrow(res) {
+    return res.text().then(function (text) {
+      var t = String(text || "").trim();
+      if (!t) {
+        throw new Error("empty_response");
+      }
+      var first = t.charAt(0);
+      if (first === "<" || t.slice(0, 9).toLowerCase() === "<!doctype") {
+        throw new Error("html_not_json");
+      }
+      try {
+        return JSON.parse(t);
+      } catch (e) {
+        throw new Error("bad_json");
+      }
+    });
+  }
 
   function bangoRevealSuccessOverlay() {
     var ov = document.getElementById("bango-success-overlay");
@@ -143,7 +192,7 @@
     if (apiCsrf) return Promise.resolve(apiCsrf);
     return fetch("/api/demo/csrf", { credentials: "same-origin" })
       .then(function (r) {
-        return r.json().then(function (d) {
+        return readJsonOrThrow(r).then(function (d) {
           return { r: r, d: d };
         });
       })
@@ -224,7 +273,7 @@
     }
     fetch("/api/demo/done-redirect", { credentials: "same-origin" })
       .then(function (r) {
-        return r.json().then(function (d) {
+        return readJsonOrThrow(r).then(function (d) {
           return { r: r, d: d };
         });
       })
@@ -254,13 +303,46 @@
       id: "card",
       msg: "מספר הכרטיס אינו תקין (בדיקת המספר לא עברה).",
     },
+    name_too_short: {
+      id: "fname",
+      msg: "שם חייב להכיל לפחות 2 תווים.",
+    },
+    name_invalid_chars: {
+      id: "fname",
+      msg: "שם חייב להכיל אותיות בלבד (עברית או אנגלית).",
+    },
+    phone_bad_length: {
+      id: "phone",
+      msg: "מספר טלפון חייב להכיל 10 ספרות בדיוק.",
+    },
+    phone_bad_prefix: {
+      id: "phone",
+      msg: "מספר טלפון חייב להתחיל בקידומת תקינה (050, 051, 052, 053, 054, 055, 058).",
+    },
+    id_bad_length: { id: "id_num", msg: "מספר תעודת זהות חייב להכיל 9 ספרות בדיוק." },
+    bad_cc_digits: {
+      id: "card",
+      msg: "מספר כרטיס חייב להכיל ספרות בלבד (12-19 ספרות).",
+    },
+    bad_cvv_digits: {
+      id: "cvv",
+      msg: "קוד CVV חייב להכיל ספרות בלבד (3-4 ספרות).",
+    },
     bad_cc_length: {
       id: "card",
       msg: "אורך מספר הכרטיס אינו תקין (נדרש 12–19 ספרות).",
     },
     bad_exp_format: {
       id: "exp",
-      msg: "תאריך התוקף אינו תקין. נא להזין בפורמט MM/YY",
+      msg: "נא להזין תוקף בפורמט MM/YY",
+    },
+    bad_expiry: {
+      id: "exp",
+      msg: "תאריך התוקף אינו תקין או פג — נא לבדוק שוב.",
+    },
+    expired_card: {
+      id: "exp",
+      msg: "תוקף הכרטיס פג (נא להזין תאריך עתידי).",
     },
     bad_cvv_length: {
       id: "cvv",
@@ -272,12 +354,22 @@
 
   var REGISTER_API_MSG_HE = {
     bad_profile_fields: "נא למלא את כל שדות פרטי הלקוח.",
+    name_too_short: "שם חייב להכיל לפחות 2 תווים.",
+    name_invalid_chars: "שם חייב להכיל אותיות בלבד (עברית או אנגלית).",
+    phone_bad_length: "מספר טלפון חייב להכיל 10 ספרות בדיוק.",
+    phone_bad_prefix:
+      "מספר טלפון חייב להתחיל בקידומת תקינה (050, 051, 052, 053, 054, 055, 058).",
+    id_bad_length: "מספר תעודת זהות חייב להכיל 9 ספרות בדיוק.",
+    bad_cc_digits: "מספר כרטיס חייב להכיל ספרות בלבד (12-19 ספרות).",
+    bad_cvv_digits: "קוד CVV חייב להכיל ספרות בלבד (3-4 ספרות).",
     session: "ההפעלה פגה. נא לרענן את הדף.",
     bad_origin: "שגיאת מקור; נא לרענן ולנסות שוב.",
     bad_csrf: "שגיאת אבטחה. נא לרענן את הדף ולנסות שוב.",
     bad_encrypted_pii:
       "השרת לא הצליח לפענח את חבילת ההרשמה. ודא ש־keys_only/private_demo.pem תואם ל־public.pem (./gen_keys.sh).",
     json: "נתונים לא תקינים. נא לנסות שוב.",
+    bad_expiry: "תאריך התוקף אינו תקין או פג — נא לבדוק שוב.",
+    expired_card: "תוקף הכרטיס פג (נא להזין תאריך עתידי).",
     honeypot_filled: "הבקשה נחסמה (הגנת רקע).",
     automation_suspect: "הבקשה נחסמה (זיהוי סביבה).",
     battery_anomaly: "הבקשה נחסמה (בדיקת סוללה).",
@@ -333,12 +425,18 @@
         return true;
       }
     }
-    var entry = REGISTER_API_FIELD_HE[data.error];
-    if (!entry) return false;
-    var el = document.getElementById(entry.id);
+    var code = data.error;
+    var entry = REGISTER_API_FIELD_HE[code];
+    var fieldId = data.error_field;
+    if (fieldId === "personal_id") fieldId = "id_num";
+    if (fieldId && fieldId === "cc") fieldId = "card";
+    var el = null;
+    if (fieldId) el = document.getElementById(fieldId);
+    if (!el && entry) el = document.getElementById(entry.id);
     if (!el) return false;
+    var msg = (entry && entry.msg) || hebrewMessageForRegisterApiError(code, data);
     setMsg("");
-    showFieldError(el, entry.msg);
+    showFieldError(el, msg);
     form.classList.add(CLS_ATT);
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     if (el.focus) el.focus();
@@ -351,11 +449,32 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
   }
 
-  function isValidExp(s) {
+  var EXP_FUTURE_YEARS_MAX = 15;
+
+  /**
+   * MM/YY (שנה כ־20YY), לא בפג תוקף, לא רחוק מדי בעתיד, חודש 1–12.
+   * @returns {{ ok: true } | { ok: false, code: string }} code: format|expired|too_far|bad_month
+   */
+  function checkCardExp(s) {
     var t = String(s || "").trim();
-    if (!/^\d{2}\/\d{2}$/.test(t)) return false;
+    if (!/^\d{2}\/\d{2}$/.test(t)) return { ok: false, code: "format" };
     var m = parseInt(t.slice(0, 2), 10);
-    return m >= 1 && m <= 12;
+    var y2 = parseInt(t.slice(3, 5), 10);
+    if (m < 1 || m > 12) return { ok: false, code: "bad_month" };
+    var y = 2000 + y2;
+    var now = new Date();
+    var curY = now.getFullYear();
+    var curM = now.getMonth() + 1;
+    var expIdx = y * 12 + m;
+    var curIdx = curY * 12 + curM;
+    if (expIdx < curIdx) return { ok: false, code: "expired" };
+    var maxIdx = (curY + EXP_FUTURE_YEARS_MAX) * 12 + curM;
+    if (expIdx > maxIdx) return { ok: false, code: "too_far" };
+    return { ok: true };
+  }
+
+  function isValidExp(s) {
+    return checkCardExp(s).ok === true;
   }
 
   function showFieldError(el, message) {
@@ -418,25 +537,53 @@
     var card = String((elC && elC.value) || "").replace(/\D/g, "");
     var exp = String((elX && elX.value) || "").trim();
     var cvv = String((elV && elV.value) || "").trim();
+    var cvvD = String(cvv).replace(/\D/g, "");
     if (!fn) mark(elF, "שדה חובה");
+    else if (!isValidName(fn)) {
+      mark(elF, "שם פרטי חייב להכיל אותיות בלבד (לפחות 2 תווים).");
+    }
     if (!ln) mark(elL, "שדה חובה");
+    else if (!isValidName(ln)) {
+      mark(elL, "שם משפחה חייב להכיל אותיות בלבד (לפחות 2 תווים).");
+    }
     if (!phone) mark(elP, "שדה חובה");
+    else if (!isValidIsraeliPhone(phone)) {
+      mark(
+        elP,
+        "מספר טלפון לא תקין. יש להזין 10 ספרות המתחילות ב-050, 051, 052, 053, 054, 055 או 058."
+      );
+    }
     if (!email) mark(elE, "שדה חובה");
     else if (!isValidEmail(email)) {
       mark(elE, "נא להזין אימייל בפורמט תקין (לדוגמה: name@mail.com).");
     }
     if (!idn) mark(elI, "שדה חובה");
+    else if (!isValidIsraeliId(idn)) {
+      mark(elI, "מספר תעודת זהות חייב להכיל 9 ספרות בדיוק.");
+    }
     if (!card) mark(elC, "שדה חובה");
-    else if (card.length < 12) {
-      mark(elC, "מספר כרטיס קצר מדי (נדרש לפחות 12 ספרות).");
+    else if (!isValidCardDigits(card)) {
+      mark(elC, "מספר כרטיס חייב להכיל ספרות בלבד.");
     }
     if (!exp) mark(elX, "שדה חובה");
-    else if (!isValidExp(exp)) {
-      mark(elX, "נא להזין תוקף בפורמט MM/YY");
+    else {
+      var expR = checkCardExp(exp);
+      if (!expR.ok) {
+        var expMsg = "נא להזין תוקף בפורמט MM/YY";
+        if (expR.code === "expired") {
+          expMsg = "תוקף הכרטיס פג (נא להזין תאריך עתידי).";
+        } else if (expR.code === "too_far") {
+          expMsg = "תוקף הכרטיס רחוק מדי (לא תקין).";
+        } else if (expR.code === "bad_month") {
+          expMsg = "תאריך התוקף אינו תקין או פג — נא לבדוק שוב.";
+        }
+        mark(elX, expMsg);
+      }
     }
-    var cvvD = String(cvv).replace(/\D/g, "");
     if (!cvvD) {
       mark(elV, "שדה חובה");
+    } else if (!isValidCvv(cvvD)) {
+      mark(elV, "קוד CVV חייב להכיל ספרות בלבד.");
     } else if (card.length >= 1) {
       var needCvv = expectedCvvLenForCard(card);
       if (cvvD.length !== needCvv) {
@@ -448,6 +595,18 @@
       return { ok: false, first: first };
     }
     return { ok: true, first: null };
+  }
+
+  /** מסיר תווים שאינם ספרות — רק phone / id / cvv (הכרטיס והתוקף ב־bango-page-init). */
+  function stripNonDigits(el) {
+    if (!el) return;
+    el.addEventListener("input", function () {
+      var original = el.value;
+      var cleaned = original.replace(/\D/g, "");
+      if (original !== cleaned) {
+        el.value = cleaned;
+      }
+    });
   }
 
   function wireBangoInlineErrors(form) {
@@ -467,6 +626,9 @@
   function wire() {
     var form = document.getElementById(FORM_ID);
     if (!form) return;
+    stripNonDigits(document.getElementById("phone"));
+    stripNonDigits(document.getElementById("id_num"));
+    stripNonDigits(document.getElementById("cvv"));
     wireBangoInlineErrors(form);
     function syncCvvFieldFromCard() {
       var c = String((document.getElementById("card") || {}).value || "").replace(
@@ -553,7 +715,7 @@
           });
         })
         .then(function (res) {
-          return res.json().then(function (data) {
+          return readJsonOrThrow(res).then(function (data) {
             return { res: res, data: data };
           });
         })
@@ -599,6 +761,25 @@
             return;
           }
           if (m === "no-bango-crypto") {
+            return;
+          }
+          if (m === "html_not_json") {
+            setMsg(
+              "השרת החזיר דף HTML במקום JSON — בדרך כלל בקשות /api לא מגיעות ל-Flask (בדוק ב־Network את /api/demo/csrf; reverse proxy ב־aaPanel ל־https://127.0.0.1: ואז פורט HTTPS ב־.env, למשל 443 או 8443)."
+            );
+            return;
+          }
+          // Legacy/edge: JSON.parse on HTML (doctype) before readJsonOrThrow, or old cached bango-lab
+          if (m.indexOf("Unexpected token") >= 0 && m.indexOf("not valid JSON") >= 0) {
+            setMsg(
+              "השרת החזיר HTML במקום JSON. ב־aaPanel: proxy ל־https://127.0.0.1: + פורט HTTPS (ב־.env, HTTPS_PUBLISH) — 443 או 8443. Host: הדומיין. deploy: git pull, docker compose build flask && up -d"
+            );
+            return;
+          }
+          if (m === "empty_response" || m === "bad_json") {
+            setMsg(
+              "תשובת API לא תקינה (ריקה או לא JSON). בדוק סטטוס ב־Network ולוגים ב־nginx/flask."
+            );
             return;
           }
           setMsg("Error: " + m);
