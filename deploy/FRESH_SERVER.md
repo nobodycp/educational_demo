@@ -9,27 +9,40 @@ This is the same stack as [install.sh](../install.sh) in the repo. Most “extra
 3. **One directory only** for the app (e.g. `/root/educational_demo` or `/opt/educational_demo`). **Do not** `git clone` inside an existing clone.
 4. Decide: **(A)** this server is **dedicated** to the lab (simplest: nothing else on 80/443), or **(B)** **aaPanel** (or another Nginx) already uses 80/443 — then you will use **HTTP_PUBLISH=8080** and **HTTPS_PUBLISH=8443** and a **reverse proxy** from the domain to `127.0.0.1:8443` with the correct **Host** header.
 
-## Clean install (recommended order)
+## One command (new server, non-interactive)
+
+**Before:** A record: `yourdomain` → this server. Cloudflare **Zone.DNS:Edit** token.
+
+**On the server (root, Ubuntu/Debian):** set variables, then pipe `bootstrap` (it clones/updates, runs `install.sh` with `INSTALL_NONINTERACTIVE=1`, runs `gen_keys` if needed, `docker compose build`, TLS, Nginx). **Do not** put the token in the `curl` line in shared environments; use a root shell, export, then `curl`.
+
+```bash
+export DOMAIN=lab.example.com
+export EMAIL_LE=admin@you.com
+export CF_TOKEN=YourCloudflareAPIToken
+curl -fsSL https://raw.githubusercontent.com/nobodycp/educational_demo/main/deploy/bootstrap.sh | bash
+```
+
+- Optional: `EDU_DEMO_DIR=/opt/edu-demo` to choose install path; default: `$HOME/educational_demo`.
+- If 80/443 are busy, `install.sh` will pick 8080/8443; then set reverse proxy in your panel to `https://127.0.0.1:8443` with correct **Host** (see top of this file).
+
+**Interactive** (prompts) instead: `git clone … && ./install.sh` (no `INSTALL_NONINTERACTIVE`).
+
+## Clean install (manual / step by step)
 
 ```bash
 # 1) OS packages (Debian/Ubuntu)
 apt-get update && apt-get install -y git curl ca-certificates
 
 # 2) Clone once
-cd /root   # or /opt
+cd /root
 git clone https://github.com/nobodycp/educational_demo.git
 cd educational_demo
-chmod +x install.sh update.sh deploy/render-nginx.sh deploy/teardown.sh
+chmod +x install.sh update.sh deploy/render-nginx.sh deploy/teardown.sh gen_keys.sh
 
-# 3) RSA keys (one run — private never goes to git)
-./gen_keys.sh
-# This writes keys_only/private_demo.pem and frontend/static/keys/public.pem (pair).
-
-# 4) First-time install (Docker, .env, Cloudflare DNS-01, compose up)
+# 3) install.sh (interactive) or non-interactive exports + ./install.sh; keys: install runs gen_keys if missing
 ./install.sh
-# Answer DOMAIN = your FQDN, email, API token. If 80/443 are busy, install.sh may set 8080/8443 in .env.
 
-# 5) Rebuild the Flask image so the NEW public.pem is inside the image
+# 4) If you ran gen_keys after first build, rebuild flask so public.pem is in the image
 docker compose build --no-cache flask
 docker compose up -d
 ```

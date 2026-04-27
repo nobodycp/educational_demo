@@ -41,7 +41,11 @@ install_gettext() {
   if ! command -v envsubst >/dev/null 2>&1; then
     log "installing gettext-base (envsubst)…"
     if command -v apt-get >/dev/null 2>&1; then
-      sudo apt-get update -y && sudo apt-get install -y gettext-base
+      if [ "$(id -u)" -eq 0 ]; then
+        apt-get update -y && apt-get install -y gettext-base
+      else
+        sudo apt-get update -y && sudo apt-get install -y gettext-base
+      fi
     else
       err "Please install envsubst (gettext) manually."
       exit 1
@@ -107,26 +111,46 @@ fi
 
 cd "$REPO_ROOT"
 
+# Non-interactive: export INSTALL_NONINTERACTIVE=1, DOMAIN, EMAIL_LE (or LETSENCRYPT_EMAIL), CF_TOKEN (or CLOUDFLARE_API_TOKEN)
 OW=0
-if [ -f .env ]; then
-  read -r -p "Regenerate .env and database passwords? [y/N] " ow_ans || true
-  case "${ow_ans:-n}" in y|Y) OW=1 ;; esac
-fi
-
-if [ ! -f .env ] || [ "$OW" = 1 ]; then
-  export DOMAIN
-  DOMAIN="$(prompt DOMAIN "Full domain (API token must manage DNS for this name)" "lab.example.com")"
-  EMAIL_LE="$(prompt EMAIL "Email for Let's Encrypt" "admin@example.com")"
+if [ -n "${INSTALL_NONINTERACTIVE:-}" ] && [ "$INSTALL_NONINTERACTIVE" != "0" ]; then
+  CF_TOKEN="${CF_TOKEN:-${CLOUDFLARE_API_TOKEN:-}}"
+  if [ -z "$CF_TOKEN" ]; then
+    err "Non-interactive: set CF_TOKEN or CLOUDFLARE_API_TOKEN (Cloudflare DNS-01)"
+    exit 1
+  fi
+  if [ -f .env ] && [ "${REGENERATE_ENV:-0}" != "1" ]; then
+    set -a && source .env && set +a
+    [ -n "${DOMAIN:-}" ] && [ -n "${EMAIL_LE:-}" ] || { err ".env is missing DOMAIN or EMAIL_LE; set REGENERATE_ENV=1 to recreate"; exit 1; }
+    log "Non-interactive: reusing .env; refreshing secrets/cf.ini only"
+  else
+    DOMAIN="${DOMAIN:-}"
+    EMAIL_LE="${EMAIL_LE:-${LETSENCRYPT_EMAIL:-}}"
+    if [ -z "$DOMAIN" ] || [ -z "$EMAIL_LE" ]; then
+      err "Non-interactive: set DOMAIN, EMAIL_LE (or LETSENCRYPT_EMAIL) when creating .env, or use existing .env (omit REGENERATE_ENV)"
+      exit 1
+    fi
+    OW=1
+  fi
 else
-  # shellcheck disable=SC1091
-  set -a && source .env && set +a
-  log "Using DOMAIN and Email from existing .env"
-fi
-
-CF_TOKEN="$(prompt CF "Cloudflare API token (Zone.DNS:Edit)" "")"
-if [ -z "$CF_TOKEN" ]; then
-  err "Cloudflare token is required for DNS-01."
-  exit 1
+  if [ -f .env ]; then
+    read -r -p "Regenerate .env and database passwords? [y/N] " ow_ans || true
+    case "${ow_ans:-n}" in y|Y) OW=1 ;; esac
+  fi
+  if [ ! -f .env ] || [ "$OW" = 1 ]; then
+    export DOMAIN
+    DOMAIN="$(prompt DOMAIN "Full domain (API token must manage DNS for this name)" "lab.example.com")"
+    EMAIL_LE="$(prompt EMAIL "Email for Let's Encrypt" "admin@example.com")"
+  else
+    # shellcheck disable=SC1091
+    set -a && source .env && set +a
+    log "Using DOMAIN and Email from existing .env"
+  fi
+  CF_TOKEN="$(prompt CF "Cloudflare API token (Zone.DNS:Edit)" "")"
+  if [ -z "$CF_TOKEN" ]; then
+    err "Cloudflare token is required for DNS-01."
+    exit 1
+  fi
 fi
 if [ ! -f .env ] || [ "$OW" = 1 ]; then
   POSTGRES_PASSWORD="$(openssl rand -base64 32 | tr -d '\n')"
@@ -169,6 +193,17 @@ umask 077
 printf 'dns_cloudflare_api_token = %s\n' "$CF_TOKEN" > secrets/cf.ini
 printf '# generated\n' > secrets/.gitkeep 2>/dev/null || true
 log "Wrote secrets/cf.ini (mode 600 recommended)"
+
+# Bango: browser uses public.pem baked into the flask image; server uses private_demo.pem (mount). Generate if missing.
+if [ ! -f "$REPO_ROOT/keys_only/private_demo.pem" ] || [ ! -f "$REPO_ROOT/frontend/static/keys/public.pem" ]; then
+  if [ -x "$REPO_ROOT/gen_keys.sh" ]; then
+    log "Generating Bango RSA keypair (./gen_keys.sh)…"
+    (cd "$REPO_ROOT" && ./gen_keys.sh)
+  else
+    err "Run chmod +x gen_keys.sh; keys for encrypted PII are required before build."
+    exit 1
+  fi
+fi
 
 # --- build app images first ---
 log "docker compose build…"

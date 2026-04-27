@@ -42,10 +42,14 @@ The `-t .` option keeps imports like `from backend import …` and the `tests` p
 
 Use this when you want **Nginx + Gunicorn + Postgres + Redis + Let’s Encrypt (Cloudflare DNS-01)** on a server. **`install.sh` installs Docker automatically** if it is not present (get.docker.com, Ubuntu 20.04/22.04), then asks for domain, email, and Cloudflare API token, writes `.env` and `secrets/cf.ini`, issues certificates, and starts the stack. See `docker-compose.yml`, `install.sh`, and `update.sh` for details. **New clean VPS, ordered steps, aaPanel/keys gotchas:** `deploy/FRESH_SERVER.md`.
 
-**One command — clone the repo, make scripts executable, run the installer** (on a new machine with `git` and `sudo`):
+**Unattended (new server, root or sudo):** set `DOMAIN`, `EMAIL_LE`, `CF_TOKEN` (Cloudflare), then:  
+`curl -fsSL https://raw.githubusercontent.com/nobodycp/educational_demo/main/deploy/bootstrap.sh | bash`  
+Details: `deploy/FRESH_SERVER.md` and `deploy/bootstrap.sh`.
+
+**Interactive — clone the repo, make scripts executable, run the installer** (on a new machine with `git` and `sudo`):
 
 ```bash
-git clone https://github.com/nobodycp/educational_demo.git && cd educational_demo && chmod +x install.sh update.sh deploy/render-nginx.sh && ./install.sh
+git clone https://github.com/nobodycp/educational_demo.git && cd educational_demo && chmod +x install.sh update.sh deploy/render-nginx.sh gen_keys.sh && ./install.sh
 ```
 
 **Do not** run `git clone` again inside the project folder (you would get `educational_demo/educational_demo` and duplicate trees). If you need Bango PII decrypt on the server, run `./gen_keys.sh` locally, then place **`private_demo.pem` in `keys_only/`** on the server (that file is not in git). See `keys_only/README.txt`.
