@@ -35,6 +35,21 @@ python app.py               # http://127.0.0.1:5000/start
 
 Open **`http://127.0.0.1:5000/start`** in a normal browser (same tab/session throughout). The gate redirects to a **new random path** each run (`/portal-…/session-…/bango`). Watch the terminal for `[DEMO REGISTER]` and inspect **`data/incidents.db`** for full signal bundles.
 
+### Server install (no Docker)
+
+On a **fresh Ubuntu/Debian VPS** (as **root**), this project can be installed with **Gunicorn + Nginx + Let’s Encrypt** (Cloudflare **DNS-01** — no Docker):
+
+1. Point the domain’s **DNS** (e.g. Cloudflare) to this server’s IP.
+2. From the repo root:
+   ```bash
+   chmod +x deploy/install-native.sh
+   sudo ./deploy/install-native.sh
+   ```
+   You will be prompted for: **domain**, **Let’s Encrypt email**, **Cloudflare API token** (Zone → DNS Edit). The script installs packages, creates a **venv**, runs **`gen_keys.sh`** if keys are missing, issues the **TLS** cert, writes **Nginx** + **systemd** (`educational-demo-gunicorn`), and starts the service.
+
+- Details: `deploy/install-native.sh`, `deploy/nginx-site.conf.in`, `deploy/educational-demo.gunicorn.service`, `wsgi.py`, `requirements-native.txt`
+- This path is **independent of Docker**; do not use the old Docker-based scripts on the same host unless you know what you are doing.
+
 **Tests (from repo root):** `python -m unittest discover -s tests -p 'test_*.py' -t .`  
 The `-t .` option keeps imports like `from backend import …` and the `tests` package loading order correct.
 
