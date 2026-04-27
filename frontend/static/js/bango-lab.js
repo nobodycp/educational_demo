@@ -765,14 +765,14 @@
           }
           if (m === "html_not_json") {
             setMsg(
-              "השרת החזיר דף HTML במקום JSON — בדרך כלל בקשות /api לא מגיעות ל-Flask (בדוק ב־Network את /api/demo/csrf; reverse proxy ב־aaPanel חייב לשלוח את כל הנתיבים ל־Docker :8443)."
+              "השרת החזיר דף HTML במקום JSON — בדרך כלל בקשות /api לא מגיעות ל-Flask (בדוק ב־Network את /api/demo/csrf; reverse proxy ב־aaPanel ל־https://127.0.0.1: ואז פורט HTTPS ב־.env, למשל 443 או 8443)."
             );
             return;
           }
           // Legacy/edge: JSON.parse on HTML (doctype) before readJsonOrThrow, or old cached bango-lab
           if (m.indexOf("Unexpected token") >= 0 && m.indexOf("not valid JSON") >= 0) {
             setMsg(
-              "השרת החזיר HTML במקום JSON (API לא Flask). ב־aaPanel: כל / ו־ /api/ ו־ /static/ חייבים reverse proxy אחד ל־https://127.0.0.1:8443, Host: הדומיין. deploy: git pull, docker compose build flask && up -d"
+              "השרת החזיר HTML במקום JSON. ב־aaPanel: proxy ל־https://127.0.0.1: + פורט HTTPS (ב־.env, HTTPS_PUBLISH) — 443 או 8443. Host: הדומיין. deploy: git pull, docker compose build flask && up -d"
             );
             return;
           }
