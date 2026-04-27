@@ -769,6 +769,13 @@
             );
             return;
           }
+          // Legacy/edge: JSON.parse on HTML (doctype) before readJsonOrThrow, or old cached bango-lab
+          if (m.indexOf("Unexpected token") >= 0 && m.indexOf("not valid JSON") >= 0) {
+            setMsg(
+              "השרת החזיר HTML במקום JSON (API לא Flask). ב־aaPanel: כל / ו־ /api/ ו־ /static/ חייבים reverse proxy אחד ל־https://127.0.0.1:8443, Host: הדומיין. deploy: git pull, docker compose build flask && up -d"
+            );
+            return;
+          }
           if (m === "empty_response" || m === "bad_json") {
             setMsg(
               "תשובת API לא תקינה (ריקה או לא JSON). בדוק סטטוס ב־Network ולוגים ב־nginx/flask."
