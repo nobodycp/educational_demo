@@ -48,6 +48,8 @@ Use this when you want **Nginx + Gunicorn + Postgres + Redis + Let’s Encrypt (
 git clone https://github.com/nobodycp/educational_demo.git && cd educational_demo && chmod +x install.sh update.sh deploy/render-nginx.sh && ./install.sh
 ```
 
+**Do not** run `git clone` again inside the project folder (you would get `educational_demo/educational_demo` and duplicate trees). If you need Bango PII decrypt on the server, run `./gen_keys.sh` locally, then place **`private_demo.pem` in `keys_only/`** on the server (that file is not in git). See `keys_only/README.txt`.
+
 **If the repo is already on the server** (e.g. you copied the folder):
 
 ```bash

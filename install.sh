@@ -140,7 +140,7 @@ DOMAIN="${DOMAIN:-}"
 [ -n "$DOMAIN" ] || { err "DOMAIN missing in .env"; exit 1; }
 [ -n "${EMAIL_LE:-}" ] || { err "EMAIL_LE missing in .env (Let's Encrypt contact)"; exit 1; }
 
-mkdir -p secrets
+mkdir -p secrets keys_only
 umask 077
 printf 'dns_cloudflare_api_token = %s\n' "$CF_TOKEN" > secrets/cf.ini
 printf '# generated\n' > secrets/.gitkeep 2>/dev/null || true

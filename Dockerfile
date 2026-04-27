@@ -19,9 +19,7 @@ COPY wsgi.py app.py ./
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 COPY tools/ ./tools/
-# Placeholder; mount real `keys_only` + `.env` in production
-COPY keys_only/ ./keys_only/
-
+# keys_only/ is not in git (private PEM is gitignored). Empty dir; bind-mount ./keys_only at runtime.
 # Writable data (SQLite, incidents) — use volume
 RUN adduser --disabled-password --gecos "" --uid 1000 app \
     && mkdir -p /app/data /app/keys_only && chown -R app:app /app
