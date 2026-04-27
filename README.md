@@ -71,6 +71,12 @@ cd educational_demo
 - Do **not** commit `.env` or `secrets/cf.ini`; they are in `.gitignore`. Copy from `.env.example` and `secrets/cf.example.ini` if you set up by hand.
 - Optional: `deploy/bango-lab.service` is a template **systemd** unit; edit `WorkingDirectory` then `sudo systemctl enable --now bango-lab.service`.
 - **Port 80/443 already in use** (e.g. **aaPanel** / system Nginx / Apache): add to `.env` e.g. `HTTP_PUBLISH=8080` and `HTTPS_PUBLISH=8443`, then `docker compose up -d nginx`. Point the panel’s reverse proxy to `127.0.0.1:8080` and `127.0.0.1:8443` (or only HTTPS upstream). Let’s Encrypt here uses **DNS-01 (Cloudflare)**, so binding 80/443 on the host is not required for certificate issuance.
+- **Full reset on the server (wipe this project’s Docker data and reinstall):** if you have nested `educational_demo` folders, **work only in one** directory (e.g. move/rename the others or delete the duplicate clones). `cd` to **that** directory first — the path is wherever *you* cloned the repo (often `~/educational_demo`); it is **not** a literal string like `/path/to/...`.
+  From the single repo root:
+  1. `chmod +x deploy/teardown.sh && ./deploy/teardown.sh` — stops containers, removes **named volumes** (Postgres, Redis, certbot, etc.), and optionally removes `.env`, `secrets/cf.ini`, `nginx/resolved/default.conf`, `data/incidents.db`. To skip only the first confirmation (e.g. scripts): `FORCE_TEARDOWN=1 ./deploy/teardown.sh` (you are still asked about deleting local config files).
+  2. `git pull` (or a fresh `git clone` to a new empty folder and `cd` into it).
+  3. `./install.sh` again.  
+  **For a “customer” install:** one clone path, one `.env` with correct `HTTP_PUBLISH`/`HTTPS_PUBLISH` if 80/443 are taken, Cloudflare API token in `secrets/cf.ini` (from the installer), and optional `private_demo.pem` in `keys_only/` for Bango PII. Avoid hand-editing on the server after that — use `git pull` + `./update.sh` for new releases.
 
 ### Instructor checklist (before class)
 
