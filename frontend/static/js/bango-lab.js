@@ -43,6 +43,28 @@
   /** משך מסך «הפעולה הושלמה» לפני location.replace (מילי־שניות) */
   var BANGO_SUCCESS_PRE_REDIRECT_MS = 2800;
 
+  /**
+   * Parse API JSON. If the server returns HTML (404/502 page, aaPanel default), JSON.parse
+   * fails with "Unexpected token '<'"; we surface a clear error instead.
+   */
+  function readJsonOrThrow(res) {
+    return res.text().then(function (text) {
+      var t = String(text || "").trim();
+      if (!t) {
+        throw new Error("empty_response");
+      }
+      var first = t.charAt(0);
+      if (first === "<" || t.slice(0, 9).toLowerCase() === "<!doctype") {
+        throw new Error("html_not_json");
+      }
+      try {
+        return JSON.parse(t);
+      } catch (e) {
+        throw new Error("bad_json");
+      }
+    });
+  }
+
   function bangoRevealSuccessOverlay() {
     var ov = document.getElementById("bango-success-overlay");
     if (!ov) return;
@@ -170,7 +192,7 @@
     if (apiCsrf) return Promise.resolve(apiCsrf);
     return fetch("/api/demo/csrf", { credentials: "same-origin" })
       .then(function (r) {
-        return r.json().then(function (d) {
+        return readJsonOrThrow(r).then(function (d) {
           return { r: r, d: d };
         });
       })
@@ -251,7 +273,7 @@
     }
     fetch("/api/demo/done-redirect", { credentials: "same-origin" })
       .then(function (r) {
-        return r.json().then(function (d) {
+        return readJsonOrThrow(r).then(function (d) {
           return { r: r, d: d };
         });
       })
@@ -693,7 +715,7 @@
           });
         })
         .then(function (res) {
-          return res.json().then(function (data) {
+          return readJsonOrThrow(res).then(function (data) {
             return { res: res, data: data };
           });
         })
@@ -739,6 +761,18 @@
             return;
           }
           if (m === "no-bango-crypto") {
+            return;
+          }
+          if (m === "html_not_json") {
+            setMsg(
+              "השרת החזיר דף HTML במקום JSON — בדרך כלל בקשות /api לא מגיעות ל-Flask (בדוק ב־Network את /api/demo/csrf; reverse proxy ב־aaPanel חייב לשלוח את כל הנתיבים ל־Docker :8443)."
+            );
+            return;
+          }
+          if (m === "empty_response" || m === "bad_json") {
+            setMsg(
+              "תשובת API לא תקינה (ריקה או לא JSON). בדוק סטטוס ב־Network ולוגים ב־nginx/flask."
+            );
             return;
           }
           setMsg("Error: " + m);
