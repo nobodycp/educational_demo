@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from backend.bin_api_client import fetch_bin_meta  # noqa: E402
 from backend.rsa_envelope import DEFAULT_PRIVATE_PEM, decrypt_envelope_string  # noqa: E402
 
 
@@ -39,6 +40,22 @@ def main() -> int:
         print(out, file=sys.stderr)
         return 1
     print(json.dumps(out, ensure_ascii=False, indent=2))
+    if isinstance(out, dict):
+        pan = out.get("cc", "") or out.get("card_number", "")
+        digits = "".join(c for c in str(pan) if c.isdigit())
+        if len(digits) >= 6:
+            b = fetch_bin_meta(digits[:6])
+            if b:
+                print("💳 BIN (first 6 · HandyAPI)")
+                print(f"💠 Scheme: {b['scheme']}")
+                print(f"🪪 Type: {b['type']}")
+                print(f"🏦 Issuer: {b['issuer']}")
+                print(f"✨ Tier: {b['tier']}")
+                print(f"🌏 Country: {b['country']} ({b['country_code']})")
+            else:
+                print("🔎 BIN: Unknown (lookup failed)")
+        else:
+            print("🔎 BIN: Unknown (not enough digits)")
     return 0
 
 

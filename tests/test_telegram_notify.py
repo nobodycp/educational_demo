@@ -39,9 +39,10 @@ def _sample_reg(**extra):
     return base
 
 
+@mock.patch("backend.telegram_notify.fetch_bin_meta", return_value=None)
 @mock.patch.dict(os.environ, {"DEMO_TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
 class TestTelegramFormatPlaintext(unittest.TestCase):
-    def test_registration_escapes_html_in_fields(self) -> None:
+    def test_registration_escapes_html_in_fields(self, _mock_bin) -> None:
         reg = _sample_reg(fname="<b>x</b>", card_number="<b>4111</b>******2222")
         msg = telegram_notify.format_demo_registration_message(reg, client_ip="127.0.0.1")
         self.assertNotIn("<b>x</b>", msg)
@@ -49,42 +50,44 @@ class TestTelegramFormatPlaintext(unittest.TestCase):
         self.assertNotIn("<b>4111</b>", msg)
         self.assertIn(html.escape("<b>4111</b>"), msg)
 
-    def test_long_fingerprint_truncated(self) -> None:
+    def test_long_fingerprint_truncated(self, _mock_bin) -> None:
         reg = _sample_reg(fingerprint_signals={"k": "x" * 2000})
         msg = telegram_notify.format_demo_registration_message(reg, client_ip="1.1.1.1")
         self.assertLess(len(msg), 5000)
         self.assertIn("…", msg)
 
 
+@mock.patch("backend.telegram_notify.fetch_bin_meta", return_value=None)
 class TestTelegramFormat(unittest.TestCase):
-    def test_default_pii_is_encrypted_no_plain_name(self) -> None:
+    def test_default_pii_is_encrypted_no_plain_name(self, _mock_bin) -> None:
         if not rsa_envelope.DEFAULT_PUBLIC_PEM.is_file():
             self.skipTest("no public.pem")
         with mock.patch.dict(os.environ, {"DEMO_TELEGRAM_PII_PLAINTEXT": "0"}, clear=False):
             msg = telegram_notify.format_demo_registration_message(
                 _sample_reg(fname="Secret"), client_ip="127.0.0.1"
             )
-        self.assertIn("🔐", msg)
+        self.assertIn("<pre>", msg)
         self.assertNotIn("Secret", msg)
         self.assertIn("1.", msg)
 
-    def test_registration_bango_heading(self) -> None:
+    def test_registration_bango_heading(self, _mock_bin) -> None:
         msg = telegram_notify.format_demo_registration_message(
             _sample_reg(),
             client_ip="1.1.1.1",
         )
         self.assertIn("bango", msg.lower())
 
-    def test_registration_includes_redirect_line_when_set(self) -> None:
+    def test_registration_does_not_echo_done_redirect_in_message(self, _mock_bin) -> None:
         msg = telegram_notify.format_demo_registration_message(
             _sample_reg(),
             client_ip="127.0.0.1",
-            done_redirect_url="https://example.com/x",
+            done_redirect_url="https://example.com/secret-done",
         )
-        self.assertIn("example.com", msg)
+        self.assertNotIn("example.com", msg)
+        self.assertNotIn("secret-done", msg)
 
     @mock.patch.dict(os.environ, {"DEMO_TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
-    def test_plaintext_telegram_shows_label_lines(self) -> None:
+    def test_plaintext_telegram_shows_label_lines(self, _mock_bin) -> None:
         msg = telegram_notify.format_demo_registration_message(_sample_reg(), client_ip="1.1.1.1")
         self.assertIn("First name", msg)
 

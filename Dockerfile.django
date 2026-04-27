@@ -1,0 +1,33 @@
+# Optional Django (Gunicorn) — Nginx sub-path /d/ → this service
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+# curl used by healthcheck
+
+WORKDIR /srv/django
+COPY django_bootstrap/requirements-django.txt ./
+RUN pip install --no-cache-dir -r requirements-django.txt
+COPY django_bootstrap/ ./
+RUN chmod a+x /srv/django/docker-entrypoint.sh
+
+RUN adduser --disabled-password --gecos "" --uid 1000 djangouser \
+    && mkdir -p /srv/django/staticfiles && chown -R djangouser:djangouser /srv/django
+USER djangouser
+
+ENTRYPOINT ["/srv/django/docker-entrypoint.sh"]
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:8000/health/" -o /dev/null || exit 1
+
+CMD ["gunicorn", "portal.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "2", \
+     "--timeout", "60", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]

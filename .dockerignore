@@ -1,0 +1,14 @@
+.git
+.github
+**/__pycache__
+**/*.pyc
+**/.mypy_cache
+.pytest_cache
+.env
+.venv
+venv
+node_modules
+*.md
+tests
+nginx/resolved
+secrets

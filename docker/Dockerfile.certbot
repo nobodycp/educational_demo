@@ -1,0 +1,4 @@
+# Certbot with Cloudflare DNS-01 (Let's Encrypt)
+FROM certbot/certbot:v2.10.0
+
+RUN pip install --no-cache-dir "certbot-dns-cloudflare"

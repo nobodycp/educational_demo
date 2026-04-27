@@ -1,6 +1,9 @@
 /**
  * Bango: card masking, amount/report placeholders, tab segments, CVV toggle.
  * Loaded after bango-crypto, before bango-lab.
+ *
+ * Card + expiry: digit-only cleanup and grouping/slash live here only — bango-lab does not
+ * strip those fields (would fight spacing/MMYY formatting). Phone, id, CVV strip in bango-lab.
  */
 (function () {
   "use strict";
