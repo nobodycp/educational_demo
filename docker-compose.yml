@@ -84,8 +84,8 @@ services:
   nginx:
     image: nginx:1.25-alpine
     depends_on:
-      - flask
-      - django
+      flask: { condition: service_healthy }
+      django: { condition: service_healthy }
     # If aaPanel/Apache/another Nginx use 80/443, set in .env e.g. HTTP_PUBLISH=8080 HTTPS_PUBLISH=8443
     ports:
       - "${HTTP_PUBLISH:-80}:80"
