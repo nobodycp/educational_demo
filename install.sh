@@ -61,6 +61,23 @@ prompt() {
   printf %s "$val"
 }
 
+# If something already listens on 80/443 (aaPanel, Apache, host Nginx), use alternate host ports.
+suggest_nginx_host_ports() {
+  local pub_http=80 pub_https=443
+  if ! command -v ss >/dev/null 2>&1; then
+    printf %s "%s" "$pub_http $pub_https"
+    return
+  fi
+  # Match listeners ending in :80 or :443 (IPv4/IPv6)
+  if ss -tln 2>/dev/null | awk 'NR>1 {print $4}' | grep -qE ':80$'; then
+    pub_http=8080
+  fi
+  if ss -tln 2>/dev/null | awk 'NR>1 {print $4}' | grep -qE ':443$'; then
+    pub_https=8443
+  fi
+  printf %s "%s" "$pub_http $pub_https"
+}
+
 # --- main flow ---
 [ -f "$SCRIPT_DIR/docker-compose.yml" ] || { err "Run from repository root (docker-compose.yml missing)."; exit 1; }
 
@@ -114,6 +131,10 @@ fi
 if [ ! -f .env ] || [ "$OW" = 1 ]; then
   POSTGRES_PASSWORD="$(openssl rand -base64 32 | tr -d '\n')"
   DJANGO_SECRET_KEY="$(openssl rand -base64 48 | tr -d '\n')"
+  read -r HTTP_PUBLISH HTTPS_PUBLISH <<<"$(suggest_nginx_host_ports)"
+  if [ "$HTTP_PUBLISH" != 80 ] || [ "$HTTPS_PUBLISH" != 443 ]; then
+    log "Host ports 80/443 look busy; using HTTP_PUBLISH=$HTTP_PUBLISH HTTPS_PUBLISH=$HTTPS_PUBLISH (set reverse proxy to 127.0.0.1:$HTTP_PUBLISH and :$HTTPS_PUBLISH or only HTTPS)."
+  fi
   cat > .env <<EOF
 DOMAIN=$DOMAIN
 POSTGRES_USER=lab
@@ -126,9 +147,9 @@ DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY
 DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1
 EMAIL_LE=$EMAIL_LE
-# If 80/443 are taken (aaPanel, etc.), change to e.g. 8080 / 8443 and reverse-proxy.
-HTTP_PUBLISH=80
-HTTPS_PUBLISH=443
+# Host ports for Nginx (80/443 if free; else 8080/8443 with aaPanel or similar on 80/443)
+HTTP_PUBLISH=$HTTP_PUBLISH
+HTTPS_PUBLISH=$HTTPS_PUBLISH
 EOF
   chmod 600 .env
   log "Wrote .env (secrets inside — keep private)"
@@ -178,7 +199,9 @@ chmod +x "$REPO_ROOT/deploy/render-nginx.sh" 2>/dev/null || true
 bash "$REPO_ROOT/deploy/render-nginx.sh"
 
 if ! docker compose up -d nginx; then
-  err "Nginx failed. If you see 'address already in use' on :80 or :443, set in .env e.g. HTTP_PUBLISH=8080 HTTPS_PUBLISH=8443 (aaPanel/Apache often owns 80/443), then: docker compose up -d nginx"
+  err "Nginx failed. If you see 'address already in use' on :80 or :443, set alternate host ports, then start Nginx again:"
+  err "  sed -i.bak 's/^HTTP_PUBLISH=.*/HTTP_PUBLISH=8080/;s/^HTTPS_PUBLISH=.*/HTTPS_PUBLISH=8443/' .env && docker compose up -d nginx"
+  err "  Then point the panel (aaPanel) reverse proxy to 127.0.0.1:8080 and 127.0.0.1:8443 (or HTTPS only)."
   err "If TLS path errors, verify /etc/letsencrypt on the certbot volume."
   exit 1
 fi
