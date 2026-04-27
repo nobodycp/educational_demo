@@ -38,6 +38,37 @@ Open **`http://127.0.0.1:5000/start`** in a normal browser (same tab/session thr
 **Tests (from repo root):** `python -m unittest discover -s tests -p 'test_*.py' -t .`  
 The `-t .` option keeps imports like `from backend import …` and the `tests` package loading order correct.
 
+## Docker & server (optional)
+
+Use this when you want **Nginx + Gunicorn + Postgres + Redis + Let’s Encrypt (Cloudflare DNS-01)** on a server. **`install.sh` installs Docker automatically** if it is not present (get.docker.com, Ubuntu 20.04/22.04), then asks for domain, email, and Cloudflare API token, writes `.env` and `secrets/cf.ini`, issues certificates, and starts the stack. See `docker-compose.yml`, `install.sh`, and `update.sh` for details.
+
+**One command — clone the repo, make scripts executable, run the installer** (on a new machine with `git` and `sudo`):
+
+```bash
+git clone https://github.com/nobodycp/educational_demo.git && cd educational_demo && chmod +x install.sh update.sh deploy/render-nginx.sh && ./install.sh
+```
+
+**If the repo is already on the server** (e.g. you copied the folder):
+
+```bash
+cd educational_demo
+chmod +x install.sh update.sh deploy/render-nginx.sh
+./install.sh
+```
+
+**Update code, rebuild, migrate Django, restart containers** (after the first install):
+
+```bash
+cd educational_demo
+./update.sh
+```
+
+**Notes:**
+
+- `install.sh` can also run `apt-get` to install **`gettext-base`** (for `envsubst`) and may add your user to the `docker` group in its messages — follow those hints if `docker` needs `sudo` until re-login.
+- Do **not** commit `.env` or `secrets/cf.ini`; they are in `.gitignore`. Copy from `.env.example` and `secrets/cf.example.ini` if you set up by hand.
+- Optional: `deploy/bango-lab.service` is a template **systemd** unit; edit `WorkingDirectory` then `sudo systemctl enable --now bango-lab.service`.
+
 ### Instructor checklist (before class)
 
 1. **`cp .env.example .env`** and set at least **`FLASK_SECRET_KEY`**.
