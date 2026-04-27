@@ -62,14 +62,14 @@ prompt() {
   else
     read -r -p "$prompt: " val || true
   fi
-  printf %s "$val"
+  printf '%s' "$val"
 }
 
 # If something already listens on 80/443 (aaPanel, Apache, host Nginx), use alternate host ports.
 suggest_nginx_host_ports() {
   local pub_http=80 pub_https=443
   if ! command -v ss >/dev/null 2>&1; then
-    printf %s "%s" "$pub_http $pub_https"
+    printf "%s %s" "$pub_http" "$pub_https"
     return
   fi
   # Match listeners ending in :80 or :443 (IPv4/IPv6)
@@ -79,7 +79,7 @@ suggest_nginx_host_ports() {
   if ss -tln 2>/dev/null | awk 'NR>1 {print $4}' | grep -qE ':443$'; then
     pub_https=8443
   fi
-  printf %s "%s" "$pub_http $pub_https"
+  printf "%s %s" "$pub_http" "$pub_https"
 }
 
 # --- main flow ---
