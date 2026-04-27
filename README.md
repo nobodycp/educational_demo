@@ -40,7 +40,7 @@ The `-t .` option keeps imports like `from backend import …` and the `tests` p
 
 ## Docker & server (optional)
 
-Use this when you want **Nginx + Gunicorn + Postgres + Redis + Let’s Encrypt (Cloudflare DNS-01)** on a server. **`install.sh` installs Docker automatically** if it is not present (get.docker.com, Ubuntu 20.04/22.04), then asks for domain, email, and Cloudflare API token, writes `.env` and `secrets/cf.ini`, issues certificates, and starts the stack. See `docker-compose.yml`, `install.sh`, and `update.sh` for details.
+Use this when you want **Nginx + Gunicorn + Postgres + Redis + Let’s Encrypt (Cloudflare DNS-01)** on a server. **`install.sh` installs Docker automatically** if it is not present (get.docker.com, Ubuntu 20.04/22.04), then asks for domain, email, and Cloudflare API token, writes `.env` and `secrets/cf.ini`, issues certificates, and starts the stack. See `docker-compose.yml`, `install.sh`, and `update.sh` for details. **New clean VPS, ordered steps, aaPanel/keys gotchas:** `deploy/FRESH_SERVER.md`.
 
 **One command — clone the repo, make scripts executable, run the installer** (on a new machine with `git` and `sudo`):
 
