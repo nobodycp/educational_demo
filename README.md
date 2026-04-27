@@ -70,6 +70,7 @@ cd educational_demo
 - `install.sh` can also run `apt-get` to install **`gettext-base`** (for `envsubst`) and may add your user to the `docker` group in its messages — follow those hints if `docker` needs `sudo` until re-login.
 - Do **not** commit `.env` or `secrets/cf.ini`; they are in `.gitignore`. Copy from `.env.example` and `secrets/cf.example.ini` if you set up by hand.
 - Optional: `deploy/bango-lab.service` is a template **systemd** unit; edit `WorkingDirectory` then `sudo systemctl enable --now bango-lab.service`.
+- **Port 80/443 already in use** (e.g. **aaPanel** / system Nginx / Apache): add to `.env` e.g. `HTTP_PUBLISH=8080` and `HTTPS_PUBLISH=8443`, then `docker compose up -d nginx`. Point the panel’s reverse proxy to `127.0.0.1:8080` and `127.0.0.1:8443` (or only HTTPS upstream). Let’s Encrypt here uses **DNS-01 (Cloudflare)**, so binding 80/443 on the host is not required for certificate issuance.
 
 ### Instructor checklist (before class)
 

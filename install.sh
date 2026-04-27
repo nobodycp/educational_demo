@@ -126,6 +126,9 @@ DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY
 DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1
 EMAIL_LE=$EMAIL_LE
+# If 80/443 are taken (aaPanel, etc.), change to e.g. 8080 / 8443 and reverse-proxy.
+HTTP_PUBLISH=80
+HTTPS_PUBLISH=443
 EOF
   chmod 600 .env
   log "Wrote .env (secrets inside — keep private)"
@@ -175,7 +178,8 @@ chmod +x "$REPO_ROOT/deploy/render-nginx.sh" 2>/dev/null || true
 bash "$REPO_ROOT/deploy/render-nginx.sh"
 
 if ! docker compose up -d nginx; then
-  err "Nginx failed to start — verify paths under /etc/letsencrypt in container."
+  err "Nginx failed. If you see 'address already in use' on :80 or :443, set in .env e.g. HTTP_PUBLISH=8080 HTTPS_PUBLISH=8443 (aaPanel/Apache often owns 80/443), then: docker compose up -d nginx"
+  err "If TLS path errors, verify /etc/letsencrypt on the certbot volume."
   exit 1
 fi
 
