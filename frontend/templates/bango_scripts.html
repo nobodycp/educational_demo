@@ -25,7 +25,7 @@
     function chain() {
       fetchXor("fingerprint", function () {
         fetchXor("behavior", function () {
-          var needShell = typeof window.__DEMO_SHELL_GUARD__ !== "undefined" && BJ.t["shell-guard"];
+          var needShell = typeof window.__SHELL_GUARD__ !== "undefined" && BJ.t["shell-guard"];
           function afterCore() {
             if (window.EduLabBehavior) window.EduLabBehavior.start();
             fetchXor("incognito-hint", function () {

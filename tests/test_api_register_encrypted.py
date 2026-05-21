@@ -18,7 +18,7 @@ class TestApiRegisterEncrypted(unittest.TestCase):
             self.skipTest("RSA keys missing (run gen_keys.sh)")
         self._p_env = mock.patch.dict(
             os.environ,
-            {"DEMO_RISK_BLOCK_THRESHOLD": "100", "DEMO_INCOGNITO_BLOCK": "0"},
+            {"RISK_BLOCK_THRESHOLD": "100", "INCOGNITO_BLOCK": "0"},
             clear=False,
         )
         self._p_env.start()

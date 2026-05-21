@@ -1,18 +1,16 @@
 """
 Strict port of **gate / processor** responsibilities (`sys/gate/engine.php`, `proc.php`).
 
-This module implements the **nine-step validation pipeline** used in advanced kits:
+This module implements the **seven-step validation pipeline** used in advanced kits:
 
 1. **Lifetime IP quota** — lab blocks an IP forever after ``N`` successful gate passes (SQLite).
 2. **Rate limiting** — in-memory sliding window per IP (burst control).
-3. **Host blacklisting** — reject disallowed `Host` headers (virtual-host abuse).
-4. **User-Agent blacklisting** — block obvious automation signatures.
-5. **Incognito / private-mode hints** — consume client-reported `signals` (no magic).
-6. **Risk scoring** — composite score from signals + lists + timing heuristics.
-7. **API handshake** — session-bound CSRF, proof-of-work, and handshake nonce.
-8. **HMAC request signing** — `HMAC-SHA256(secret, ts + "|" + canonical_json)` over the body.
-9. **External policy (optional)** — when ``DEMO_EXTERNAL_GUARD`` is ``on`` (see code), POST IP + UA
-   to ``DEMO_EXTERNAL_GUARD_URL``; ``access_denied`` in JSON becomes the final deny.
+3. **Incognito / private-mode hints** — consume client-reported `signals` (no magic).
+4. **Risk scoring** — composite score from signals + timing heuristics.
+5. **API handshake** — session-bound CSRF, proof-of-work, and handshake nonce.
+6. **HMAC request signing** — `HMAC-SHA256(secret, ts + "|" + canonical_json)` over the body.
+7. **External policy (optional)** — when ``EXTERNAL_GUARD`` is ``on`` (see code), POST IP + UA
+   to ``EXTERNAL_GUARD_URL``; ``access_denied`` in JSON becomes the final deny.
    With ``set_runtime_dotenv_path``, guard URL / key / switch are read from ``.env`` on each request.
 
 **XOR obfuscation** helpers mirror kits that XOR-encode CSS class names or DOM markers
@@ -42,7 +40,7 @@ def set_runtime_dotenv_path(path: Path | None) -> None:
     """
     When set (Flask ``create_app`` passes ``ROOT / ".env"``), external-guard keys are
     re-read from that file on **every** gate decision so instructors can toggle
-    ``DEMO_EXTERNAL_GUARD`` / URL / key without restarting the dev server.
+    ``EXTERNAL_GUARD`` / URL / key without restarting the dev server.
     """
     global _RUNTIME_DOTENV_PATH
     _RUNTIME_DOTENV_PATH = path
@@ -153,7 +151,7 @@ def _rate_window_seconds() -> int:
     while still smoothing bursts inside the window.
     """
     try:
-        return int(os.environ.get("DEMO_RATE_WINDOW_SEC", "60"))
+        return int(os.environ.get("RATE_WINDOW_SEC", "60"))
     except ValueError:
         return 60
 
@@ -169,7 +167,7 @@ def lifetime_gate_max() -> int:
     kiosk sessions; clearing ``incidents.db`` resets the lab counter.
     """
     try:
-        return int(os.environ.get("DEMO_GATE_LIFETIME_MAX_ALLOWS_PER_IP", "10"))
+        return int(os.environ.get("GATE_LIFETIME_MAX_ALLOWS_PER_IP", "10"))
     except ValueError:
         return 10
 
@@ -184,7 +182,7 @@ def _rate_max_hits() -> int:
     NAT users and protection against parallel scripted requests.
     """
     try:
-        return int(os.environ.get("DEMO_RATE_MAX", "600"))
+        return int(os.environ.get("RATE_MAX", "600"))
     except ValueError:
         return 600
 
@@ -215,7 +213,7 @@ def step_lifetime_ip_quota(ip: str, sql_root: Path | None) -> GateDecision | Non
     """
     **Pipeline step 1 — Lifetime gate quota per IP (SQLite).**
 
-    After ``DEMO_GATE_LIFETIME_MAX_ALLOWS_PER_IP`` **consumed slots** for this IP, every
+    After ``GATE_LIFETIME_MAX_ALLOWS_PER_IP`` **consumed slots** for this IP, every
     further ``POST /p`` is rejected with ``lifetime_ip_cap`` (HTTP 403) until the lab
     database is reset or the limit is increased. A slot is one successful pass **or**
     one terminal deny from the external guard (``external_guard_*`` reasons in the
@@ -262,62 +260,6 @@ def step_rate_limiting(
     return None
 
 
-def _host_blacklist() -> set[str]:
-    """
-    Parse `DEMO_HOST_BLACKLIST` as comma-separated lowercase hostnames.
-
-    **Security concept:** *Virtual-host allow/deny* — kits sometimes block hosting
-    provider default domains to reduce automated sandbox hits.
-    """
-    raw = os.environ.get("DEMO_HOST_BLACKLIST", "")
-    return {h.strip().lower() for h in raw.split(",") if h.strip()}
-
-
-def step_host_blacklisting(host_header: str | None) -> GateDecision | None:
-    """
-    **Pipeline step 2 — Host header blacklist.**
-
-    **Original PHP logic:** `$_SERVER['HTTP_HOST']` compared to deny lists / regex.
-
-    **Security concept:** *HTTP host header attacks* — mismatched hosts can poison
-    caches or hit unintended vhosts; explicit deny rules model CDN/WAF lists.
-    """
-    host = (host_header or "").strip().lower()
-    if not host:
-        return GateDecision(False, 400, "missing_host", {"score": 80, "decision": "deny"})
-    bl = _host_blacklist()
-    if bl and host in bl:
-        return GateDecision(False, 403, "host_blacklisted", {"score": 100, "decision": "deny"})
-    return None
-
-
-def _ua_blacklist_substrings() -> list[str]:
-    """
-    Parse `DEMO_UA_BLACKLIST` as comma-separated case-insensitive substrings.
-
-    **Security concept:** *Automation fingerprinting* — naive bots advertise
-    library User-Agent strings; deny rules are brittle but cheap.
-    """
-    raw = os.environ.get("DEMO_UA_BLACKLIST", "")
-    return [s.strip().lower() for s in raw.split(",") if s.strip()]
-
-
-def step_ua_blacklisting(user_agent: str | None) -> GateDecision | None:
-    """
-    **Pipeline step 3 — User-Agent blacklist.**
-
-    **Original PHP logic:** `stripos($_SERVER['HTTP_USER_AGENT'], 'curl')` style gates.
-
-    **Security concept:** *Signal stacking* — UA alone is spoofable; combined with
-    PoW/HMAC it raises attacker cost (defenders still must not trust UA).
-    """
-    ua = (user_agent or "").lower()
-    for needle in _ua_blacklist_substrings():
-        if needle and needle in ua:
-            return GateDecision(False, 403, "ua_blacklisted", {"score": 95, "decision": "deny"})
-    return None
-
-
 def _incognito_hint_from_body(
     client_flags: Mapping[str, Any] | None,
     fingerprint_signals: Mapping[str, Any] | None,
@@ -337,20 +279,20 @@ def step_incognito_detection(
     fingerprint_signals: Mapping[str, Any] | None = None,
 ) -> GateDecision | None:
     """
-    **Pipeline step 4 — Incognito / private-mode *hint* ingestion.**
+    **Pipeline step 3 — Incognito / private-mode *hint* ingestion.**
 
     **Original PHP logic:** Kits often read JS `navigator.webdriver`, storage quota,
     or `chrome.runtime` heuristics sent as JSON flags; server **cannot** prove
     incognito without client cooperation.
 
     **Security concept:** *Client-supplied context is untrusted* — we **score** rather
-    than hard-block unless ``DEMO_INCOGNITO_BLOCK`` is on (instructor-only strict mode).
+    than hard-block unless ``INCOGNITO_BLOCK`` is on (instructor-only strict mode).
     Uses ``_truthy_live`` so toggles follow the same hot-reloaded ``.env`` as the
     external guard when configured.
     """
     if not _incognito_hint_from_body(client_flags, fingerprint_signals):
         return None
-    if _truthy_live("DEMO_INCOGNITO_BLOCK"):
+    if _truthy_live("INCOGNITO_BLOCK"):
         return GateDecision(False, 403, "incognito_blocked", {"score": 70, "decision": "deny"})
     return None
 
@@ -387,7 +329,7 @@ def step_risk_scoring(
     behavior_signals: Mapping[str, Any] | None,
 ) -> tuple[GateDecision | None, dict[str, Any]]:
     """
-    **Pipeline step 5 — Composite risk scoring.**
+    **Pipeline step 4 — Composite risk scoring.**
 
     **Original PHP logic:** Weighted sums of bot hints + timing checks + TLS/JA3
     placeholders; kits clamp to `[0,100]` then branch on thresholds.
@@ -403,7 +345,7 @@ def step_risk_scoring(
     total = min(100, base + fp_score // 2 + bh_score // 2)
     risk = {"score": total, "decision": "review" if total >= 60 else "allow"}
     try:
-        threshold = int(os.environ.get("DEMO_RISK_BLOCK_THRESHOLD", "100"))
+        threshold = int(os.environ.get("RISK_BLOCK_THRESHOLD", "100"))
     except ValueError:
         threshold = 100
     if total >= threshold:
@@ -423,7 +365,7 @@ def step_api_handshake(
     verify_pow_fn,
 ) -> GateDecision | None:
     """
-    **Pipeline step 6 — API handshake (CSRF + PoW + nonce).**
+    **Pipeline step 5 — API handshake (CSRF + PoW + nonce).**
 
     **Original PHP logic:** Session token validation combined with server-issued
     challenge IDs (`pow_id`) and client-returned `pow_nonce`.
@@ -431,13 +373,13 @@ def step_api_handshake(
     **Security concept:** *Request Integrity Protection* — binds the POST to a prior
     GET (`/start`) and forces a client puzzle expensive for dumb bots.
     """
-    if not _truthy_env("DEMO_GATE_CSRF_DISABLED"):
+    if not _truthy_env("GATE_CSRF_DISABLED"):
         exp = (session_csrf_expected or "").strip()
         got = (body_csrf or "").strip()
         if not exp or not got or not hmac.compare_digest(exp, got):
             return GateDecision(False, 400, "bad_csrf", {"score": 90, "decision": "deny"})
 
-    if not _truthy_env("DEMO_HANDSHAKE_DISABLED"):
+    if not _truthy_env("HANDSHAKE_DISABLED"):
         hexp = (handshake_expected or "").strip()
         hgot = (body_handshake or "").strip()
         if not hexp or not hgot or not hmac.compare_digest(hexp, hgot):
@@ -462,7 +404,7 @@ def step_hmac_request_signing(
     skew_sec: int = 120,
 ) -> GateDecision | None:
     """
-    **Pipeline step 7 — HMAC request signing.**
+    **Pipeline step 6 — HMAC request signing.**
 
     **Original PHP logic:** `hash_hmac('sha256', $ts.'|'.$canonical_json, $secret)`
     compared in constant time to client `sig`.
@@ -492,7 +434,7 @@ def step_hmac_request_signing(
 
 def _external_guard_timeout_sec() -> float:
     try:
-        return max(1.0, min(30.0, float((_live_env("DEMO_EXTERNAL_GUARD_TIMEOUT_SEC") or "5").strip() or "5")))
+        return max(1.0, min(30.0, float((_live_env("EXTERNAL_GUARD_TIMEOUT_SEC") or "5").strip() or "5")))
     except ValueError:
         return 5.0
 
@@ -500,9 +442,9 @@ def _external_guard_timeout_sec() -> float:
 def _external_guard_fail_open() -> bool:
     """
     When True (default), unreachable/ambiguous remote responses do not block the gate.
-    Set ``DEMO_EXTERNAL_GUARD_FAIL_OPEN=false`` to deny on errors instead.
+    Set ``EXTERNAL_GUARD_FAIL_OPEN=false`` to deny on errors instead.
     """
-    raw = (_live_env("DEMO_EXTERNAL_GUARD_FAIL_OPEN") or "true").strip().lower()
+    raw = (_live_env("EXTERNAL_GUARD_FAIL_OPEN") or "true").strip().lower()
     if raw in ("0", "false", "no", "off"):
         return False
     return True
@@ -515,12 +457,12 @@ def _external_guard_env_token(raw: str | None) -> str:
 
 def _external_guard_switch_on() -> bool:
     """
-    Single master switch: ``DEMO_EXTERNAL_GUARD``.
+    Single master switch: ``EXTERNAL_GUARD``.
 
     **On** when value (case-insensitive) is one of: ``1``, ``true``, ``yes``, ``on``.
     **Off** when unset, empty, or anything else (``0``, ``false``, ``off``, …).
     """
-    v = _external_guard_env_token(_live_env("DEMO_EXTERNAL_GUARD")).lower()
+    v = _external_guard_env_token(_live_env("EXTERNAL_GUARD")).lower()
     return v in ("1", "true", "yes", "on")
 
 
@@ -530,9 +472,9 @@ def external_guard_runtime_status() -> dict[str, Any]:
 
     ``guard_env_live`` matches what ``POST /p`` uses (live ``.env`` read when configured).
     """
-    live_raw = _external_guard_env_token(_live_env("DEMO_EXTERNAL_GUARD"))
-    url_set = bool((_live_env("DEMO_EXTERNAL_GUARD_URL") or "").strip())
-    key_set = bool((_live_env("DEMO_EXTERNAL_GUARD_API_KEY") or "").strip())
+    live_raw = _external_guard_env_token(_live_env("EXTERNAL_GUARD"))
+    url_set = bool((_live_env("EXTERNAL_GUARD_URL") or "").strip())
+    key_set = bool((_live_env("EXTERNAL_GUARD_API_KEY") or "").strip())
     switch = _external_guard_switch_on()
 
     return {
@@ -551,16 +493,16 @@ def step_external_guard(client_ip: str, user_agent: str | None) -> GateDecision 
     **Pipeline step 9 (optional) — remote policy after all local checks pass.**
 
     POST JSON ``{"ip": ..., "useragent": ...}`` with ``X-API-Key`` when
-    ``DEMO_EXTERNAL_GUARD`` is on **and** URL + API key are set.
+    ``EXTERNAL_GUARD`` is on **and** URL + API key are set.
 
     **Security concept:** *Outsourced policy as final arbiter* — geo / reputation
     services return ``access_granted`` or ``access_denied``; only a clear deny
-    blocks; transport failures follow ``DEMO_EXTERNAL_GUARD_FAIL_OPEN``.
+    blocks; transport failures follow ``EXTERNAL_GUARD_FAIL_OPEN``.
     """
     if not _external_guard_switch_on():
         return None
-    url = (_live_env("DEMO_EXTERNAL_GUARD_URL") or "").strip()
-    api_key = (_live_env("DEMO_EXTERNAL_GUARD_API_KEY") or "").strip()
+    url = (_live_env("EXTERNAL_GUARD_URL") or "").strip()
+    api_key = (_live_env("EXTERNAL_GUARD_API_KEY") or "").strip()
     if not url or not api_key:
         return None
 
@@ -671,7 +613,6 @@ def verify_pow_sha256_leading_hex(pow_id: str, nonce: str, zeros: int) -> bool:
 def process_gate_submission(
     *,
     client_ip: str,
-    host_header: str | None,
     user_agent: str | None,
     body: dict[str, Any],
     gate_csrf: str | None,
@@ -697,26 +638,19 @@ def process_gate_submission(
     r1 = step_rate_limiting(client_ip, rate_store)
     if r1:
         return r1
-    r2 = step_host_blacklisting(host_header)
+    client_flags = body.get("client_flags") if isinstance(body.get("client_flags"), dict) else {}
+    fp_sig = body.get("fingerprint_signals") if isinstance(body.get("fingerprint_signals"), dict) else {}
+    r2 = step_incognito_detection(client_flags, fp_sig)
     if r2:
         return r2
-    r3 = step_ua_blacklisting(user_agent)
+
+    bh_sig = body.get("behavior_signals") if isinstance(body.get("behavior_signals"), dict) else {}
+    r3, risk = step_risk_scoring(client_flags, fp_sig, bh_sig)
     if r3:
         return r3
 
-    client_flags = body.get("client_flags") if isinstance(body.get("client_flags"), dict) else {}
-    fp_sig = body.get("fingerprint_signals") if isinstance(body.get("fingerprint_signals"), dict) else {}
-    r4 = step_incognito_detection(client_flags, fp_sig)
-    if r4:
-        return r4
-
-    bh_sig = body.get("behavior_signals") if isinstance(body.get("behavior_signals"), dict) else {}
-    r5, risk = step_risk_scoring(client_flags, fp_sig, bh_sig)
-    if r5:
-        return r5
-
     pow_zeros = int(gate_pow_zeros or 0)
-    r6 = step_api_handshake(
+    r4 = step_api_handshake(
         session_csrf_expected=gate_csrf,
         body_csrf=str(body.get("csrf") or "").strip() or None,
         handshake_expected=gate_handshake,
@@ -726,24 +660,24 @@ def process_gate_submission(
         pow_nonce=body.get("pow_nonce"),
         verify_pow_fn=verify_pow_sha256_leading_hex,
     )
-    if r6:
-        return r6
+    if r4:
+        return r4
 
-    r7 = step_hmac_request_signing(secret=hmac_secret, body=body, ts=body.get("ts"), sig=body.get("sig"))
-    if r7:
-        return r7
+    r5 = step_hmac_request_signing(secret=hmac_secret, body=body, ts=body.get("ts"), sig=body.get("sig"))
+    if r5:
+        return r5
 
     fp_hash = str(body.get("fingerprint_hash") or "").strip()
     if len(fp_hash) < 8:
         return GateDecision(False, 400, "weak_client", {**risk, "decision": "deny"})
 
-    r8 = step_external_guard(client_ip, user_agent)
-    if r8:
+    r6 = step_external_guard(client_ip, user_agent)
+    if r6:
         return GateDecision(
-            r8.allowed,
-            r8.http_status,
-            r8.reason,
-            {**risk, **r8.risk},
+            r6.allowed,
+            r6.http_status,
+            r6.reason,
+            {**risk, **r6.risk},
         )
 
     return GateDecision(True, 200, "ok", risk)

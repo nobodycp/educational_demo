@@ -26,7 +26,7 @@ def main() -> None:
         1,
     )
     s = s.replace(
-        "    __DEMO_BANGO_SHELL_INJECT__\n",
+        "    __BANGO_SHELL_INJECT__\n",
         "    {% if bango_shell_inject %}{{ bango_shell_inject|safe }}{% endif %}\n",
     )
     s = s.replace("#pangoFinalForm", "#{{ bcls['bango-form'] }}")

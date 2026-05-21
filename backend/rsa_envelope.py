@@ -181,10 +181,10 @@ PII_BUNDLE_ALLOWED_KEYS: frozenset[str] = frozenset(
 
 def private_key_path_for_bango_pii() -> Path:
     """
-    ``DEMO_BANGO_PII_DECRYPT_PEM`` overrides the default ``keys_only/private_demo.pem`` when the
+    ``BANGO_PII_DECRYPT_PEM`` overrides the default ``keys_only/private_demo.pem`` when the
     server must read client-wrapped PII.
     """
-    p = (os.environ.get("DEMO_BANGO_PII_DECRYPT_PEM") or "").strip()
+    p = (os.environ.get("BANGO_PII_DECRYPT_PEM") or "").strip()
     if p:
         return Path(p).expanduser()
     return DEFAULT_PRIVATE_PEM

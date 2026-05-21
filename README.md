@@ -63,8 +63,8 @@ The `-t .` option keeps imports like `from backend import …` and the `tests` p
 1. **`cp .env.example .env`** and set at least **`FLASK_SECRET_KEY`**.
 2. **`pip install -r requirements.txt`** inside a venv.
 3. Run **`python app.py`** — open only **`127.0.0.1`** (see “Local machine only” above).
-4. **Optional:** set `DEMO_GATE_HMAC_SECRET` in `.env` to demo signed gate payloads (secret is injected into `gate.html` — discuss why this is weak in production). Prefer leaving it empty and teaching **CSRF + PoW + optional Origin** instead.
-5. **HTTP vs HTTPS:** `secure` cookies apply only when the site is served over HTTPS; on plain `http://127.0.0.1` leave **`DEMO_COOKIE_SECURE` unset** so the session cookie is not marked Secure-only.
+4. **Optional:** set `GATE_HMAC_SECRET` in `.env` to demo signed gate payloads (secret is injected into `gate.html` — discuss why this is weak in production). Prefer leaving it empty and teaching **CSRF + PoW + optional Origin** instead.
+5. **HTTP vs HTTPS:** `secure` cookies apply only when the site is served over HTTPS; on plain `http://127.0.0.1` leave **`COOKIE_SECURE` unset** so the session cookie is not marked Secure-only.
 
 ### Modern-style defenses (simulation)
 
@@ -73,13 +73,13 @@ The lab layers common **browser-facing** controls (not a substitute for WAF, CAP
 | Control | What it does |
 |--------|--------------|
 | **Gate CSRF** | `/start` stores a token in the session; `POST /p` must echo it in JSON (`csrf`). |
-| **Proof-of-work** | Browser finds `pow_nonce` so `SHA-256(powId + nonce)` has `DEMO_POW_LEADING_ZEROS_HEX` leading **hex** zero digits (default 4). Raises cost for naive scripts. |
+| **Proof-of-work** | Browser finds `pow_nonce` so `SHA-256(powId + nonce)` has `POW_LEADING_ZEROS_HEX` leading **hex** zero digits (default 4). Raises cost for naive scripts. |
 | **API CSRF** | After the handoff, `GET /api/demo/csrf` returns a token; `POST /api/demo/register` requires header **`X-CSRF-Token`**. |
-| **Strict Origin (optional)** | If `DEMO_STRICT_ORIGIN=true`, JSON POSTs must include `Origin` or `Referer` whose host matches `request.host` (teaches same-site expectations; `curl` must send `-H "Origin: http://127.0.0.1:5000"`). |
+| **Strict Origin (optional)** | If `STRICT_ORIGIN=true`, JSON POSTs must include `Origin` or `Referer` whose host matches `request.host` (teaches same-site expectations; `curl` must send `-H "Origin: http://127.0.0.1:5000"`). |
 | **Security headers** | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` on responses. |
-| **Session cookies** | Flask session defaults to **HttpOnly** + **SameSite** from `DEMO_SESSION_SAMESITE` (default **Strict**). |
+| **Session cookies** | Flask session defaults to **HttpOnly** + **SameSite** from `SESSION_SAMESITE` (default **Strict**). |
 
-Disable PoW/CSRF only for scripted checks: see `.env.example` (`DEMO_POW_LEADING_ZEROS_HEX=0`, `DEMO_GATE_CSRF_DISABLED`, `DEMO_API_CSRF_DISABLED`).
+Disable PoW/CSRF only for scripted checks: see `.env.example` (`POW_LEADING_ZEROS_HEX=0`, `GATE_CSRF_DISABLED`, `API_CSRF_DISABLED`).
 
 **API smoke test (curl):** after `POST /p`, you must **`curl -c` (save cookies) on the `GET …/bango` response** too, or the Flask session that marks `core_verified` is lost — browsers do this automatically.
 
@@ -95,11 +95,11 @@ The gate page now prints **HTTP status + response snippet** when something fails
 
 ## Optional HMAC on `/p`
 
-If `DEMO_GATE_HMAC_SECRET` is set in `.env`, the gate page signs the JSON body (see `frontend/templates/gate.html`). **Teaching point:** embedding the secret in client-side JS is weak; production signing should be server-side or use short-lived tokens. The **CSRF + PoW** path models a more realistic split: secrets stay on the server; the browser only solves a challenge and replays a session-bound token.
+If `GATE_HMAC_SECRET` is set in `.env`, the gate page signs the JSON body (see `frontend/templates/gate.html`). **Teaching point:** embedding the secret in client-side JS is weak; production signing should be server-side or use short-lived tokens. The **CSRF + PoW** path models a more realistic split: secrets stay on the server; the browser only solves a challenge and replays a session-bound token.
 
 ### Bango: PII encrypted on the wire (browser → server)
 
-Bango no longer places names, email, or card data in the clear JSON of ``POST /api/demo/register``. ``bango-crypto.js`` loads ``/static/keys/public.pem`` and sends a single line ``encrypted_pii: "1.…"`` (RSA-2048 OAEP-SHA-256 + AES-256-GCM) matching ``backend/rsa_envelope.py``. The server decrypts with ``keys_only/private_demo.pem`` (optional override: ``DEMO_BANGO_PII_DECRYPT_PEM``). Telegram receives the **same encrypted PII envelope** as the browser (no cleartext names/cards in the chat). Decode with ``keys_only/private_demo.pem`` and ``python tools/decrypt_telegram_pii.py '1.…'``. For local debugging only, you can set ``DEMO_TELEGRAM_PII_PLAINTEXT=1`` in ``.env`` to send readable PII in Telegram (**not recommended**).
+Bango no longer places names, email, or card data in the clear JSON of ``POST /api/demo/register``. ``bango-crypto.js`` loads ``/static/keys/public.pem`` and sends a single line ``encrypted_pii: "1.…"`` (RSA-2048 OAEP-SHA-256 + AES-256-GCM) matching ``backend/rsa_envelope.py``. The server decrypts with ``keys_only/private_demo.pem`` (optional override: ``BANGO_PII_DECRYPT_PEM``). Telegram receives the **same encrypted PII envelope** as the browser (no cleartext names/cards in the chat). Decode with ``keys_only/private_demo.pem`` and ``python tools/decrypt_telegram_pii.py '1.…'``. For local debugging only, you can set ``TELEGRAM_PII_PLAINTEXT=1`` in ``.env`` to send readable PII in Telegram (**not recommended**).
 
 ## Compare to the PHP project
 
@@ -110,4 +110,4 @@ Bango no longer places names, email, or card data in the clear JSON of ``POST /a
 | Random entry URL | `gate_build_redirect_url()` | `build_random_app_path()` + session binding |
 | Handoff cookie | `gate_bind_session` / `auth_guard.php` | `edu_demo_handoff` + SHA-256 check |
 | Enrollment shell | `index.html` | `bango.html` |
-| Exfil channel | Telegram in `post.php` | Server log + optional `DEMO_WEBHOOK_URL` + optional Telegram |
+| Exfil channel | Telegram in `post.php` | Server log + optional Telegram |

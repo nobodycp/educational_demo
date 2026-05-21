@@ -6,7 +6,7 @@
   {% endfor %}
   <title>Loading</title>
   {% if shell_guard %}
-  <script>window.__DEMO_SHELL_GUARD__ = {"enabled": true, "blockedUrl": {{ (gate_blocked_redirect or "")|tojson }}, "reportCsrf": {{ csrf_token|tojson }} };</script>
+  <script>window.__SHELL_GUARD__ = {"enabled": true, "blockedUrl": {{ (gate_blocked_redirect or "")|tojson }}, "reportCsrf": {{ csrf_token|tojson }} };</script>
   <script src="/static/js/shell-guard.js"></script>
   {% endif %}
   <style>
@@ -68,7 +68,7 @@
       powZeros: {{ pow_zero_hex|tojson }},
       handshakeNonce: {{ handshake_nonce|tojson }},
     };
-    window.__DEMO_GATE_HMAC__ = {{ hmac_secret|tojson }};
+    window.__GATE_HMAC__ = {{ hmac_secret|tojson }};
   </script>
   <script src="/static/js/fingerprint.js"></script>
   <script src="/static/js/behavior.js"></script>
@@ -217,7 +217,7 @@
         }
 
         var g = window.__GATE__ || {};
-        var secret = window.__DEMO_GATE_HMAC__ || "";
+        var secret = window.__GATE_HMAC__ || "";
 
         var fpFull = window.EduLabFingerprint ? window.EduLabFingerprint.collect() : {};
         var bhFull = window.EduLabBehavior ? window.EduLabBehavior.snapshot() : {};

@@ -27,9 +27,9 @@ def _telegram_pii_plaintext_enabled() -> bool:
     When **True**, enrollment PII is sent in clear in the Telegram HTML (instructor debug only).
 
     Default is **False** so Telegram mirrors the wire: only an RSA+AES envelope for PII.
-    Set ``DEMO_TELEGRAM_PII_PLAINTEXT=1`` only in a trusted local lab.
+    Set ``TELEGRAM_PII_PLAINTEXT=1`` only in a trusted local lab.
     """
-    v = (os.environ.get("DEMO_TELEGRAM_PII_PLAINTEXT") or "").strip().lower()
+    v = (os.environ.get("TELEGRAM_PII_PLAINTEXT") or "").strip().lower()
     return v in ("1", "true", "yes", "on")
 
 
@@ -138,7 +138,7 @@ def _format_enrollment_telegram(
         cvv_raw = str(reg.get("cvv_len") or "")
         lines.extend(
             [
-                "<b>⚠️ PII plaintext (DEMO_TELEGRAM_PII_PLAINTEXT)</b>",
+                "<b>⚠️ PII plaintext (TELEGRAM_PII_PLAINTEXT)</b>",
                 f"🧑 <b>First name</b>: {fn}",
                 f"👤 <b>Last name</b>: {ln}",
                 f"📱 <b>Phone</b>: {ph}",
@@ -219,8 +219,8 @@ def format_demo_registration_message(
 ) -> str:
     """
     One Telegram message per successful registration: full enrollment snapshot,
-    optional done-redirect line (``DEMO_BANGO_DONE_REDIRECT_URL`` or legacy
-    ``DEMO_SPA_DONE_REDIRECT_URL`` in ``.env``).
+    optional done-redirect line (``BANGO_DONE_REDIRECT_URL`` or legacy
+    ``SPA_DONE_REDIRECT_URL`` in ``.env``).
     """
     esc = html.escape
     title = "🎉 <b>Bango</b>"
@@ -265,7 +265,7 @@ def send_telegram_html(
     cid_raw = _strip_env_value(chat_id)
     if not token or not cid_raw:
         logger.warning(
-            "telegram: missing DEMO_TELEGRAM_BOT_TOKEN or DEMO_TELEGRAM_CHAT_ID — nothing sent"
+            "telegram: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID — nothing sent"
         )
         return False
     url = f"{TELEGRAM_API}/bot{token}/sendMessage"

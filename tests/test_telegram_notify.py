@@ -39,7 +39,7 @@ def _sample_reg(**extra):
     return base
 
 
-@mock.patch.dict(os.environ, {"DEMO_TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
+@mock.patch.dict(os.environ, {"TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
 class TestTelegramFormatPlaintext(unittest.TestCase):
     def test_registration_escapes_html_in_fields(self) -> None:
         reg = _sample_reg(fname="<b>x</b>", card_number="<b>4111</b>******2222")
@@ -60,7 +60,7 @@ class TestTelegramFormat(unittest.TestCase):
     def test_default_pii_is_encrypted_no_plain_name(self) -> None:
         if not rsa_envelope.DEFAULT_PUBLIC_PEM.is_file():
             self.skipTest("no public.pem")
-        with mock.patch.dict(os.environ, {"DEMO_TELEGRAM_PII_PLAINTEXT": "0"}, clear=False):
+        with mock.patch.dict(os.environ, {"TELEGRAM_PII_PLAINTEXT": "0"}, clear=False):
             msg = telegram_notify.format_demo_registration_message(
                 _sample_reg(fname="Secret"), client_ip="127.0.0.1"
             )
@@ -83,7 +83,7 @@ class TestTelegramFormat(unittest.TestCase):
         )
         self.assertIn("example.com", msg)
 
-    @mock.patch.dict(os.environ, {"DEMO_TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
+    @mock.patch.dict(os.environ, {"TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
     def test_plaintext_telegram_shows_label_lines(self) -> None:
         msg = telegram_notify.format_demo_registration_message(_sample_reg(), client_ip="1.1.1.1")
         self.assertIn("First name", msg)

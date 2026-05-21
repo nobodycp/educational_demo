@@ -78,9 +78,9 @@ def _start_debug_key() -> str:
     Shared secret query value for the instructor **gate debug** page (`/start?test=…`).
 
     **Security concept:** *Security through obscurity is weak* — this is only for
-    local labs; change `DEMO_START_DEBUG_SECRET` and never expose this on the public web.
+    local labs; change `START_DEBUG_SECRET` and never expose this on the public web.
     """
-    v = (os.environ.get("DEMO_START_DEBUG_SECRET") or "1234").strip()
+    v = (os.environ.get("START_DEBUG_SECRET") or "1234").strip()
     return v or "1234"
 
 
@@ -98,7 +98,7 @@ def _truthy_env(name: str) -> bool:
 
 def _quiet_demonstration_terminal() -> bool:
     """If True: fewer Werkzeug access lines + no ``[DEMO REGISTER]`` in the dev terminal."""
-    return _truthy_env("DEMO_QUIET_TERMINAL")
+    return _truthy_env("QUIET_TERMINAL")
 
 
 def _apply_quiet_terminal_if_configured() -> None:
@@ -126,27 +126,27 @@ def _int_env(name: str, default: int, min_v: int, max_v: int) -> int:
 
 def _bango_reg_loading_seconds() -> int:
     """Full-screen glass after successful register, before optional extra glass / success UI."""
-    raw = (os.environ.get("DEMO_BANGO_REG_LOADING_SECONDS") or "").strip()
+    raw = (os.environ.get("BANGO_REG_LOADING_SECONDS") or "").strip()
     if raw:
-        return _int_env("DEMO_BANGO_REG_LOADING_SECONDS", 20, 1, 120)
-    return _int_env("DEMO_SPA_REG_LOADING_SECONDS", 20, 1, 120)
+        return _int_env("BANGO_REG_LOADING_SECONDS", 20, 1, 120)
+    return _int_env("SPA_REG_LOADING_SECONDS", 20, 1, 120)
 
 
 def _bango_post_reg_extra_glass_seconds() -> int:
     """
     Optional second full-screen wait after the main register glass (0–120; ``0`` allowed).
     """
-    raw = (os.environ.get("DEMO_BANGO_POST_REG_GLASS_SECONDS") or "").strip()
+    raw = (os.environ.get("BANGO_POST_REG_GLASS_SECONDS") or "").strip()
     if raw:
-        return _int_env("DEMO_BANGO_POST_REG_GLASS_SECONDS", 0, 0, 120)
-    return _int_env("DEMO_SPA_MFA_SUCCESS_LOADING_SECONDS", 0, 0, 120)
+        return _int_env("BANGO_POST_REG_GLASS_SECONDS", 0, 0, 120)
+    return _int_env("SPA_MFA_SUCCESS_LOADING_SECONDS", 0, 0, 120)
 
 
 def _bango_done_redirect_delay_sec() -> int:
-    raw = (os.environ.get("DEMO_BANGO_DONE_REDIRECT_DELAY_SEC") or "").strip()
+    raw = (os.environ.get("BANGO_DONE_REDIRECT_DELAY_SEC") or "").strip()
     if raw:
-        return _int_env("DEMO_BANGO_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
-    return _int_env("DEMO_SPA_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
+        return _int_env("BANGO_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
+    return _int_env("SPA_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
 
 
 def _strict_origin_enabled() -> bool:
@@ -158,7 +158,7 @@ def _strict_origin_enabled() -> bool:
     **Security concept:** *Cross-origin policy* — complements CSRF tokens by rejecting
     posts that lack a browser same-site navigation context.
     """
-    return _truthy_env("DEMO_STRICT_ORIGIN")
+    return _truthy_env("STRICT_ORIGIN")
 
 
 def _origin_ok_for_request() -> bool:
@@ -203,7 +203,7 @@ def _pow_leading_zeros() -> int:
     CPU on headless farms; too high harms legitimate mobile clients.
     """
     try:
-        n = int(os.environ.get("DEMO_POW_LEADING_ZEROS_HEX", "4"))
+        n = int(os.environ.get("POW_LEADING_ZEROS_HEX", "4"))
     except ValueError:
         n = 4
     if n <= 0:
@@ -220,7 +220,7 @@ def _handoff_pepper() -> str:
     **Security concept:** *Keyed verification* — prevents cookie forgery without the
     server secret even if an attacker guesses the random handoff token.
     """
-    return os.environ.get("DEMO_HANDOFF_SECRET", "change-me-in-dotenv")
+    return os.environ.get("HANDOFF_SECRET", "change-me-in-dotenv")
 
 
 def _client_ip_for_lab() -> str:
@@ -238,14 +238,14 @@ def _client_ip_for_lab() -> str:
 
 def _gate_blocked_redirect_url() -> str | None:
     """
-    Optional absolute URL (from ``DEMO_GATE_BLOCKED_REDIRECT_URL``) sent to the browser
+    Optional absolute URL (from ``GATE_BLOCKED_REDIRECT_URL``) sent to the browser
     when the gate denies with ``lifetime_ip_cap``, ``incognito_blocked``, or
     ``external_guard_denied`` (when configured) so the client can navigate away.
 
     **Security concept:** *Allowlist URL scheme* — only ``http``/``https`` with a host
     are accepted to avoid ``javascript:`` open-redirect style abuse in the lab.
     """
-    raw = (os.environ.get("DEMO_GATE_BLOCKED_REDIRECT_URL") or "").strip()
+    raw = (os.environ.get("GATE_BLOCKED_REDIRECT_URL") or "").strip()
     raw = raw.strip("\ufeff\"'")
     if not raw:
         return None
@@ -260,7 +260,7 @@ def _gate_blocked_redirect_url() -> str | None:
 
 def _read_guard_devtools_preference() -> str:
     """
-    First set value among ``GUARD_DEVTOOLS``, ``guard_devtools``, ``DEMO_SHELL_GUARD``
+    First set value among ``GUARD_DEVTOOLS``, ``guard_devtools``, ``SHELL_GUARD``
     (order matters). Reads ``PROJECT_ROOT/.env`` on each call via :func:`get_key` so
     editing the file can take effect **without** restarting Flask (like external-guard
     hot values). If no key has a non-empty value in the file, falls back to
@@ -268,7 +268,7 @@ def _read_guard_devtools_preference() -> str:
     """
     from dotenv import get_key
 
-    keys = ("GUARD_DEVTOOLS", "guard_devtools", "DEMO_SHELL_GUARD")
+    keys = ("GUARD_DEVTOOLS", "guard_devtools", "SHELL_GUARD")
     p = PROJECT_ROOT / ".env"
     if p.is_file():
         for k in keys:
@@ -292,8 +292,8 @@ def _read_guard_devtools_preference() -> str:
 def _shell_guard_enabled() -> bool:
     """
     When True, gate / Bango pages load ``shell-guard.js`` (right-click off, devtools
-    heuristics, redirect to ``DEMO_GATE_BLOCKED_REDIRECT_URL`` if set).
-    Toggles: ``GUARD_DEVTOOLS=0`` / ``1``, ``guard_devtools``, or legacy ``DEMO_SHELL_GUARD``
+    heuristics, redirect to ``GATE_BLOCKED_REDIRECT_URL`` if set).
+    Toggles: ``GUARD_DEVTOOLS=0`` / ``1``, ``guard_devtools``, or legacy ``SHELL_GUARD``
     (see :func:`_read_guard_devtools_preference`).
     """
     v = _read_guard_devtools_preference()
@@ -313,19 +313,19 @@ def _bango_shell_inject_script_tags(report_csrf: str = "", csp_nonce: str = "") 
     }
     n = (csp_nonce or "").strip()
     open_tag = f'<script nonce="{escape(n)}">' if n else "<script>"
-    return f"{open_tag}window.__DEMO_SHELL_GUARD__={json.dumps(cfg)}</script>\n"
+    return f"{open_tag}window.__SHELL_GUARD__={json.dumps(cfg)}</script>\n"
 
 
 def _bango_inject_shell_guard(html: str, report_csrf: str = "") -> str:
     """
     Insert shell-guard config + script into ``bango.html`` (placeholder token).
-    Reuses the same allowlisted URL as server-side block UX (``DEMO_GATE_BLOCKED_REDIRECT_URL``).
+    Reuses the same allowlisted URL as server-side block UX (``GATE_BLOCKED_REDIRECT_URL``).
     ``report_csrf`` is ``SESSION_API_CSRF`` for ``POST /api/demo/shell-guard-deny`` logging.
     """
     inject = _bango_shell_inject_script_tags(report_csrf)
     if not inject:
-        return html.replace("__DEMO_BANGO_SHELL_INJECT__", "")
-    return html.replace("__DEMO_BANGO_SHELL_INJECT__", inject)
+        return html.replace("__BANGO_SHELL_INJECT__", "")
+    return html.replace("__BANGO_SHELL_INJECT__", inject)
 
 
 def _bango_done_redirect_url() -> str | None:
@@ -336,8 +336,8 @@ def _bango_done_redirect_url() -> str | None:
     only ``http``/``https`` with a host.
     """
     raw = (
-        os.environ.get("DEMO_BANGO_DONE_REDIRECT_URL")
-        or os.environ.get("DEMO_SPA_DONE_REDIRECT_URL")
+        os.environ.get("BANGO_DONE_REDIRECT_URL")
+        or os.environ.get("SPA_DONE_REDIRECT_URL")
         or ""
     ).strip()
     raw = raw.strip("\ufeff\"'")
@@ -368,7 +368,7 @@ def _incognito_api_blocked_response():
     else:
         body["redirect_missing"] = True
         body["hint"] = (
-            "incognito_blocked: set DEMO_GATE_BLOCKED_REDIRECT_URL in .env to an "
+            "incognito_blocked: set GATE_BLOCKED_REDIRECT_URL in .env to an "
             "https:// URL, then restart the Flask process."
         )
     resp = make_randomized_json_response(body, 403, status_pool="session")
@@ -507,15 +507,15 @@ def _validate_cvv_digits(raw: str) -> str | None:
 
 def _send_lab_telegram(html_message: str) -> None:
     """If Telegram env is set, POST one HTML ``sendMessage`` (no-op otherwise)."""
-    t_tok = (os.environ.get("DEMO_TELEGRAM_BOT_TOKEN") or "").strip()
-    t_chat = (os.environ.get("DEMO_TELEGRAM_CHAT_ID") or "").strip()
+    t_tok = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    t_chat = (os.environ.get("TELEGRAM_CHAT_ID") or "").strip()
     if not t_tok or not t_chat:
         return
     telegram_notify.send_telegram_html(
         t_tok,
         t_chat,
         html_message,
-        message_thread_id=(os.environ.get("DEMO_TELEGRAM_THREAD_ID") or "").strip() or None,
+        message_thread_id=(os.environ.get("TELEGRAM_THREAD_ID") or "").strip() or None,
     )
 
 
@@ -567,8 +567,8 @@ def create_app() -> Flask:
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE=os.environ.get("DEMO_SESSION_SAMESITE") or "Strict",
-        SESSION_COOKIE_SECURE=_truthy_env("DEMO_COOKIE_SECURE"),
+        SESSION_COOKIE_SAMESITE=os.environ.get("SESSION_SAMESITE") or "Strict",
+        SESSION_COOKIE_SECURE=_truthy_env("COOKIE_SECURE"),
     )
 
     incident_store.init_incident_db(PROJECT_ROOT)
@@ -606,7 +606,7 @@ def create_app() -> Flask:
 
         **Original PHP logic:** `start.php` rendering gate HTML with embedded challenges.
 
-        Query **`?test=<DEMO_START_DEBUG_SECRET>`** (default `1234`) shows a local-only
+        Query **`?test=<START_DEBUG_SECRET>`** (default `1234`) shows a local-only
         debug dashboard: rate-limit bucket + recent `gate_decision` rows from SQLite.
         """
         if (request.args.get("test") or "").strip() == _start_debug_key():
@@ -647,7 +647,7 @@ def create_app() -> Flask:
         session[SESSION_GATE_HANDSHAKE] = handshake
         session[SESSION_UI_XOR_KEY] = xor_key
         session.modified = True
-        hmac_secret = os.environ.get("DEMO_GATE_HMAC_SECRET", "")
+        hmac_secret = os.environ.get("GATE_HMAC_SECRET", "")
         ui_labels = ["gate-status"]
         ui_map = gate_engine.build_ui_class_map(ui_labels, xor_key)
         return render_template(
@@ -719,7 +719,6 @@ def create_app() -> Flask:
 
         decision = gate_engine.process_gate_submission(
             client_ip=_client_ip_for_lab(),
-            host_header=request.headers.get("Host"),
             user_agent=request.headers.get("User-Agent"),
             body=body,
             gate_csrf=session.get(SESSION_GATE_CSRF),
@@ -727,7 +726,7 @@ def create_app() -> Flask:
             gate_pow_zeros=int(session.get(SESSION_GATE_POW_ZEROS) or 0),
             gate_handshake=session.get(SESSION_GATE_HANDSHAKE),
             rate_store=_rate_store,
-            hmac_secret=os.environ.get("DEMO_GATE_HMAC_SECRET", ""),
+            hmac_secret=os.environ.get("GATE_HMAC_SECRET", ""),
             quota_sql_root=PROJECT_ROOT,
         )
 
@@ -773,7 +772,7 @@ def create_app() -> Flask:
                 else:
                     blocked_body["redirect_missing"] = True
                     blocked_body["hint"] = (
-                        f"{decision.reason}: set DEMO_GATE_BLOCKED_REDIRECT_URL in .env to an "
+                        f"{decision.reason}: set GATE_BLOCKED_REDIRECT_URL in .env to an "
                         "https:// URL, then restart the Flask process."
                     )
             _pool = "rate" if decision.reason == "rate_limit" else None
@@ -1023,7 +1022,7 @@ def create_app() -> Flask:
         **Security concept:** *Double-submit / custom header CSRF* — JSON endpoints
         ignore simple form POST CSRF unless attacker also reads SameSite session cookies.
         """
-        if _truthy_env("DEMO_API_CSRF_DISABLED"):
+        if _truthy_env("API_CSRF_DISABLED"):
             return True
         exp = session.get(SESSION_API_CSRF) or ""
         got = (request.headers.get("X-CSRF-Token") or "").strip()
@@ -1195,21 +1194,6 @@ def create_app() -> Flask:
             session_id=None,
             payload=payload,
         )
-
-        webhook = os.environ.get("DEMO_WEBHOOK_URL", "").strip()
-        if webhook.startswith("https://"):
-            try:
-                import urllib.request
-
-                req = urllib.request.Request(
-                    webhook,
-                    data=json.dumps({"demo": "register", "payload": payload}).encode(),
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                urllib.request.urlopen(req, timeout=5)
-            except Exception as e:
-                app.logger.info("webhook skip: %s", e)
 
         _lab_ip = _client_ip_for_lab()
         _done = _bango_done_redirect_url() or ""

@@ -31,14 +31,14 @@ def _truthy(name: str) -> bool:
 
 def _jitter_max_ms() -> int:
     try:
-        v = int((os.environ.get("DEMO_RESPONSE_JITTER_MS_MAX") or "0").strip() or 0, 10)
+        v = int((os.environ.get("RESPONSE_JITTER_MS_MAX") or "0").strip() or 0, 10)
     except (TypeError, ValueError):
         return 0
     return max(0, min(2000, v))
 
 
 def _ip_blocklist() -> frozenset[str]:
-    raw = (os.environ.get("DEMO_IP_BLOCKLIST") or "").strip()
+    raw = (os.environ.get("IP_BLOCKLIST") or "").strip()
     if not raw:
         return frozenset()
     parts = re.split(r"[\s,;]+", raw)
@@ -103,7 +103,7 @@ def _ua_equal(a: str, b: str) -> bool:
 
 
 def _before_request_ua_mismatch(SESSION_CLIENT_UA: str) -> object | None:
-    if not _truthy("DEMO_UA_MISMATCH_BLOCK"):
+    if not _truthy("UA_MISMATCH_BLOCK"):
         return None
     p = (request.path or "")
     if not p.startswith("/api/"):
@@ -120,9 +120,9 @@ def _before_request_ua_mismatch(SESSION_CLIENT_UA: str) -> object | None:
         "detail": "session_ua",
     }
     st = 403
-    if _truthy("DEMO_UA_MISMATCH_VARIABLE_STATUS"):
+    if _truthy("UA_MISMATCH_VARIABLE_STATUS"):
         st = random.choice((400, 403, 429))
-    if _truthy("DEMO_LAB_SHUFFLE_ERROR_JSON"):
+    if _truthy("LAB_SHUFFLE_ERROR_JSON"):
         return _shuffled_error(body, st)
     from flask import jsonify
 
@@ -141,7 +141,7 @@ def _before_request_ip() -> object | None:
         return None
     if path.startswith("/api/"):
         b = {"ok": False, "error": "ip_blocked", "detail": "blocklist"}
-        if _truthy("DEMO_LAB_SHUFFLE_ERROR_JSON"):
+        if _truthy("LAB_SHUFFLE_ERROR_JSON"):
             return _shuffled_error(b, 403)
         from flask import jsonify
 

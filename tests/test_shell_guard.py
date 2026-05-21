@@ -23,14 +23,14 @@ class TestShellGuard(unittest.TestCase):
         with mock.patch.dict(
             os.environ,
             {
-                "DEMO_GATE_BLOCKED_REDIRECT_URL": "https://example.com/away",
+                "GATE_BLOCKED_REDIRECT_URL": "https://example.com/away",
                 "GUARD_DEVTOOLS": "1",
             },
             clear=False,
         ):
-            raw = "before__DEMO_BANGO_SHELL_INJECT__after"
+            raw = "before__BANGO_SHELL_INJECT__after"
             out = app_mod._bango_inject_shell_guard(raw, "csrf-for-bango")
-        self.assertNotIn("__DEMO_BANGO_SHELL_INJECT__", out)
+        self.assertNotIn("__BANGO_SHELL_INJECT__", out)
         self.assertIn("https://example.com/away", out)
         # shell-guard.js is loaded via XOR ``/s/<token>`` from Bango, not a direct static path.
         self.assertNotIn("/static/js/shell-guard.js", out)
@@ -43,28 +43,28 @@ class TestShellGuard(unittest.TestCase):
 
     def test_inject_strips_token_when_guard_off(self) -> None:
         with mock.patch.dict(os.environ, {"GUARD_DEVTOOLS": "0"}, clear=False):
-            out = app_mod._bango_inject_shell_guard("__DEMO_BANGO_SHELL_INJECT__")
+            out = app_mod._bango_inject_shell_guard("__BANGO_SHELL_INJECT__")
         self.assertEqual(out, "")
 
     def test_shell_guard_enabled(self) -> None:
-        with mock.patch.dict(os.environ, {"DEMO_SHELL_GUARD": "off"}, clear=False):
+        with mock.patch.dict(os.environ, {"SHELL_GUARD": "off"}, clear=False):
             self.assertFalse(app_mod._shell_guard_enabled())
         with mock.patch.dict(
             os.environ,
             # Must override any GUARD_DEVTOOLS from process env (see _read order).
-            {"GUARD_DEVTOOLS": "1", "DEMO_SHELL_GUARD": "1"},
+            {"GUARD_DEVTOOLS": "1", "SHELL_GUARD": "1"},
             clear=False,
         ):
             self.assertTrue(app_mod._shell_guard_enabled())
         with mock.patch.dict(
             os.environ,
-            {"GUARD_DEVTOOLS": "0", "DEMO_SHELL_GUARD": "1"},
+            {"GUARD_DEVTOOLS": "0", "SHELL_GUARD": "1"},
             clear=False,
         ):
-            self.assertFalse(app_mod._shell_guard_enabled(), "GUARD_DEVTOOLS should win over DEMO_SHELL_GUARD")
+            self.assertFalse(app_mod._shell_guard_enabled(), "GUARD_DEVTOOLS should win over SHELL_GUARD")
         with mock.patch.dict(
             os.environ,
-            {"guard_devtools": "0", "GUARD_DEVTOOLS": "", "DEMO_SHELL_GUARD": "1"},
+            {"guard_devtools": "0", "GUARD_DEVTOOLS": "", "SHELL_GUARD": "1"},
             clear=False,
         ):
             self.assertFalse(app_mod._shell_guard_enabled())
