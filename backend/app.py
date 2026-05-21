@@ -20,6 +20,7 @@ load_dotenv(PROJECT_ROOT / ".env", override=True, interpolate=False)
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -225,15 +226,49 @@ def _handoff_pepper() -> str:
 
 def _client_ip_for_lab() -> str:
     """
-    Normalize loopback so ``::1`` and ``127.0.0.1`` share the same SQLite quota rows.
+    Resolve the real client IP behind reverse proxies (Cloudflare / Traefik / Nginx).
 
-    **Security concept:** *Stable client identity in dual-stack localhost* — avoids
-    split counters that make lifetime caps look “broken” during class demos.
+    Prefer proxy headers only when Flask sees a private/loopback peer address
+    (typical in container stacks). This avoids trusting spoofed public headers when
+    the app is directly internet-facing.
     """
-    raw = (request.remote_addr or "").strip() or "unknown"
-    if raw in ("::1", "0:0:0:0:0:0:0:1"):
-        return "127.0.0.1"
-    return raw
+    def _normalize(ip_raw: str | None) -> str | None:
+        raw = (ip_raw or "").strip()
+        if not raw:
+            return None
+        if raw in ("::1", "0:0:0:0:0:0:0:1"):
+            return "127.0.0.1"
+        try:
+            return str(ipaddress.ip_address(raw))
+        except ValueError:
+            return None
+
+    remote = _normalize(request.remote_addr)
+    if remote is None:
+        return "unknown"
+
+    try:
+        remote_ip = ipaddress.ip_address(remote)
+    except ValueError:
+        return remote
+
+    # In proxied/container setups, Flask usually sees an internal/private hop.
+    trust_forwarded = remote_ip.is_private or remote_ip.is_loopback or remote_ip.is_link_local
+    if trust_forwarded:
+        cf_ip = _normalize(request.headers.get("CF-Connecting-IP"))
+        if cf_ip:
+            return cf_ip
+        xff = (request.headers.get("X-Forwarded-For") or "").strip()
+        if xff:
+            first = xff.split(",")[0].strip()
+            xff_ip = _normalize(first)
+            if xff_ip:
+                return xff_ip
+        real_ip = _normalize(request.headers.get("X-Real-IP"))
+        if real_ip:
+            return real_ip
+
+    return remote
 
 
 def _gate_blocked_redirect_url() -> str | None:
@@ -1189,7 +1224,7 @@ def create_app() -> Flask:
         incident_store.insert_incident(
             PROJECT_ROOT,
             event_type="registration",
-            client_ip=request.remote_addr,
+            client_ip=_client_ip_for_lab(),
             user_agent=request.headers.get("User-Agent"),
             session_id=None,
             payload=payload,
@@ -1200,7 +1235,7 @@ def create_app() -> Flask:
         incident_store.insert_incident(
             PROJECT_ROOT,
             event_type="bango_register_done",
-            client_ip=request.remote_addr,
+            client_ip=_client_ip_for_lab(),
             user_agent=request.headers.get("User-Agent"),
             session_id=None,
             payload={"registration_snapshot": payload, "flow": "bango"},
