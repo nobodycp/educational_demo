@@ -58,6 +58,35 @@ On a **fresh Ubuntu/Debian VPS** (as **root**), this project can be installed wi
 **Tests (from repo root):** `python -m unittest discover -s tests -p 'test_*.py' -t .`  
 The `-t .` option keeps imports like `from backend import …` and the `tests` package loading order correct.
 
+## Multi-theme runtime (JSON/JSONL)
+
+The frontend shell is now runtime-selectable by theme while backend validation logic stays shared.
+
+- Theme folders live under `themes/<name>/` and must contain:
+  - `index.html` (must include `window.__STEPS__ = [...]`)
+  - `texts.json`
+  - optional `assets/`
+- Runtime config is file-based:
+  - `config/settings.json` (active theme, admin password, global verification config)
+  - `config/theme_registry.json` (theme metadata, extracted steps, per-theme verification override)
+- Operational audit events are written to `logs/theme_events.jsonl`.
+
+### Admin panel
+
+- Login page: `/admin/themes/login`
+- Main panel: `/admin/themes`
+- Actions:
+  - Activate theme for **new sessions**
+  - Upload/replace theme files (`index.html`, `texts.json`, optional assets)
+  - Manage global verification and per-theme verification override
+
+### Unified theme API (SPA)
+
+- `GET /api/theme/runtime` -> active frozen theme, steps, texts, verification config, csrf
+- `POST /api/theme/step` -> stores step payload for a declared `__STEPS__` step
+- `POST /api/theme/verify` -> shared verification checkpoint (global + per-theme override)
+- `POST /api/theme/submit` -> forwards to the same registration backend logic as `/api/demo/register`
+
 ### Instructor checklist (before class)
 
 1. **`cp .env.example .env`** and set at least **`FLASK_SECRET_KEY`**.

@@ -1,0 +1,10 @@
+{
+  "active_theme": "default",
+  "admin_password": "admin123",
+  "verification": {
+    "enabled": false,
+    "title": "Verification",
+    "prompt": "Enter verification code",
+    "expected_code": "123456"
+  }
+}
