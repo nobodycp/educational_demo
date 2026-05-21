@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.DS_Store
+.env
+keys_only/private_demo.pem
+data/incidents.db
+data/incidents.db-journal

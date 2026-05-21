@@ -35,6 +35,11 @@ python app.py               # http://127.0.0.1:5000/start
 
 Open **`http://127.0.0.1:5000/start`** in a normal browser (same tab/session throughout). The gate redirects to a **new random path** each run (`/portal-…/session-…/bango`). Watch the terminal for `[DEMO REGISTER]` and inspect **`data/incidents.db`** for full signal bundles.
 
+### Coolify deploy (no compose)
+
+Use `Dockerfile` as the build source in Coolify (port `5000`).  
+Full setup (env vars, SSL, private key mount): `deploy/COOLIFY.md`.
+
 ### Server install (no Docker)
 
 On a **fresh Ubuntu/Debian VPS** (as **root**), this project can be installed with **Gunicorn + Nginx + Let’s Encrypt** (Cloudflare **DNS-01** — no Docker):
