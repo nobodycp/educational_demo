@@ -16,6 +16,7 @@ class TestAdminPanel(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         root = Path(cls.tmp.name)
         cls.env_path = root / ".env"
+        cls.runtime_env_path = root / "data" / "admin_runtime.env"
         cls.theme_registry_path = root / "config" / "prebuilt_themes.json"
         cls.data_dir = root / "data"
         cls.theme_registry_path.parent.mkdir(parents=True, exist_ok=True)
@@ -47,6 +48,7 @@ class TestAdminPanel(unittest.TestCase):
 
         cls.patches = [
             mock.patch.object(app_mod, "ENV_FILE_PATH", cls.env_path),
+            mock.patch.object(app_mod, "ENV_RUNTIME_FILE_PATH", cls.runtime_env_path),
             mock.patch.object(app_mod, "THEME_REGISTRY_PATH", cls.theme_registry_path),
             mock.patch.object(app_mod, "DATA_DIR", cls.data_dir),
         ]

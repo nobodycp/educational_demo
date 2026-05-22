@@ -14,6 +14,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 ENV_FILE_PATH = PROJECT_ROOT / ".env"
+ENV_RUNTIME_FILE_PATH = PROJECT_ROOT / "data" / "admin_runtime.env"
 THEME_REGISTRY_PATH = PROJECT_ROOT / "config" / "prebuilt_themes.json"
 DATA_DIR = PROJECT_ROOT / "data"
 
@@ -598,24 +599,30 @@ def _spawn_telegram_after_register(
 
 
 def _admin_password_live() -> str:
-    val = admin_env.read_env_values(ENV_FILE_PATH, keys={"ADMIN_PANEL_PASSWORD"}).get(
-        "ADMIN_PANEL_PASSWORD", ""
-    )
+    val = admin_env.read_env_values_merged(
+        ENV_FILE_PATH,
+        ENV_RUNTIME_FILE_PATH,
+        keys={"ADMIN_PANEL_PASSWORD"},
+    ).get("ADMIN_PANEL_PASSWORD", "")
     return (val or "").strip()
 
 
 def _admin_access_mode_live() -> str:
-    val = admin_env.read_env_values(ENV_FILE_PATH, keys={"ADMIN_PANEL_ACCESS_MODE"}).get(
-        "ADMIN_PANEL_ACCESS_MODE", ""
-    )
+    val = admin_env.read_env_values_merged(
+        ENV_FILE_PATH,
+        ENV_RUNTIME_FILE_PATH,
+        keys={"ADMIN_PANEL_ACCESS_MODE"},
+    ).get("ADMIN_PANEL_ACCESS_MODE", "")
     mode = (val or "").strip().lower()
     return mode if mode in {"open", "restricted"} else "open"
 
 
 def _admin_ip_whitelist_live() -> set[str]:
-    raw = admin_env.read_env_values(ENV_FILE_PATH, keys={"ADMIN_PANEL_IP_WHITELIST"}).get(
-        "ADMIN_PANEL_IP_WHITELIST", ""
-    )
+    raw = admin_env.read_env_values_merged(
+        ENV_FILE_PATH,
+        ENV_RUNTIME_FILE_PATH,
+        keys={"ADMIN_PANEL_IP_WHITELIST"},
+    ).get("ADMIN_PANEL_IP_WHITELIST", "")
     items = re.split(r"[,\s]+", raw or "")
     return {it.strip() for it in items if it.strip()}
 
@@ -628,9 +635,11 @@ def _admin_access_allowed() -> bool:
 
 def _admin_theme_id_live() -> str:
     themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
-    env_theme = admin_env.read_env_values(ENV_FILE_PATH, keys={"ACTIVE_THEME"}).get(
-        "ACTIVE_THEME", ""
-    )
+    env_theme = admin_env.read_env_values_merged(
+        ENV_FILE_PATH,
+        ENV_RUNTIME_FILE_PATH,
+        keys={"ACTIVE_THEME"},
+    ).get("ACTIVE_THEME", "")
     requested = (env_theme or "").strip()
     if requested in themes:
         return requested
@@ -1418,7 +1427,7 @@ def create_app() -> Flask:
             "TELEGRAM_PII_PLAINTEXT",
         }
 
-        current_values = admin_env.read_env_values(ENV_FILE_PATH)
+        current_values = admin_env.read_env_values_merged(ENV_FILE_PATH, ENV_RUNTIME_FILE_PATH)
         themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
 
         if request.method == "POST":
@@ -1438,23 +1447,28 @@ def create_app() -> Flask:
                 error = "Selected theme is not in registry."
             else:
                 try:
-                    saved_keys = admin_env.write_env_values_atomic(ENV_FILE_PATH, updates)
+                    saved_keys, saved_path = admin_env.write_env_values_with_fallback(
+                        ENV_FILE_PATH, ENV_RUNTIME_FILE_PATH, updates
+                    )
                     _admin_log(
                         "admin_settings_saved",
                         {
                             "ip": _client_ip_for_lab(),
                             "saved_keys": saved_keys,
+                            "saved_path": str(saved_path),
                             "theme": updates.get("ACTIVE_THEME", current_values.get("ACTIVE_THEME", "")),
                             "action": action or "save",
                         },
                     )
                     if action == "apply":
                         notice = (
-                            "Changes were saved to .env. Apply requires manual redeploy in Coolify."
+                            f"Changes were saved to {saved_path}. Apply requires manual redeploy in Coolify."
                         )
                     else:
-                        notice = "Settings saved to .env."
-                    current_values = admin_env.read_env_values(ENV_FILE_PATH)
+                        notice = f"Settings saved to {saved_path}."
+                    current_values = admin_env.read_env_values_merged(
+                        ENV_FILE_PATH, ENV_RUNTIME_FILE_PATH
+                    )
                 except Exception as exc:
                     error = str(exc)
 

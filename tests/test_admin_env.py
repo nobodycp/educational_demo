@@ -38,3 +38,26 @@ class TestAdminEnv(unittest.TestCase):
             with self.assertRaises(ValueError):
                 admin_env.write_env_values_atomic(env_path, {"NOT_ALLOWED_KEY": "x"})
 
+    def test_merged_read_and_fallback_write(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            primary = root / ".env"
+            override = root / "data" / "admin_runtime.env"
+            primary.write_text("ACTIVE_THEME=default\n", encoding="utf-8")
+            saved_keys, target = admin_env.write_env_values_with_fallback(
+                primary, override, {"ACTIVE_THEME": "clear"}
+            )
+            self.assertEqual(saved_keys, ["ACTIVE_THEME"])
+            self.assertEqual(target, primary)
+            merged = admin_env.read_env_values_merged(primary, override, keys={"ACTIVE_THEME"})
+            self.assertEqual(merged["ACTIVE_THEME"], "clear")
+
+            primary.unlink()
+            saved_keys2, target2 = admin_env.write_env_values_with_fallback(
+                primary, override, {"ACTIVE_THEME": "post_pyment"}
+            )
+            self.assertEqual(saved_keys2, ["ACTIVE_THEME"])
+            self.assertEqual(target2, override)
+            merged2 = admin_env.read_env_values_merged(primary, override, keys={"ACTIVE_THEME"})
+            self.assertEqual(merged2["ACTIVE_THEME"], "post_pyment")
+

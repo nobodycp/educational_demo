@@ -96,6 +96,27 @@ def read_env_values(env_path: Path, *, keys: set[str] | None = None) -> dict[str
     return out
 
 
+def read_env_values_merged(
+    primary_env_path: Path,
+    override_env_path: Path,
+    *,
+    keys: set[str] | None = None,
+) -> dict[str, str]:
+    out: dict[str, str] = {}
+    read_keys = keys or all_allowlisted_keys()
+    primary_values = _parse_env_file(primary_env_path)
+    override_values = _parse_env_file(override_env_path)
+    for k in sorted(read_keys):
+        if k in override_values:
+            out[k] = override_values.get(k, "")
+            continue
+        if k in primary_values:
+            out[k] = primary_values.get(k, "")
+            continue
+        out[k] = _strip_bom_quotes(os.environ.get(k, ""))
+    return out
+
+
 def _replace_or_append_lines(lines: list[str], updates: dict[str, str]) -> list[str]:
     remaining = dict(updates)
     out_lines: list[str] = []
@@ -136,6 +157,20 @@ def write_env_values_atomic(env_path: Path, updates: dict[str, str]) -> list[str
         tmp_path = Path(tmp.name)
     os.replace(tmp_path, env_path)
     return sorted(safe_updates.keys())
+
+
+def write_env_values_with_fallback(
+    primary_env_path: Path,
+    override_env_path: Path,
+    updates: dict[str, str],
+) -> tuple[list[str], Path]:
+    """
+    Write to primary .env if it exists, otherwise to override runtime env path.
+    Returns (saved_keys, target_path).
+    """
+    target = primary_env_path if primary_env_path.exists() else override_env_path
+    saved = write_env_values_atomic(target, updates)
+    return saved, target
 
 
 def masked_value(key: str, value: str) -> str:
