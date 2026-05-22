@@ -634,6 +634,7 @@ def _spawn_telegram_after_register(
     user_agent: str | None,
     *,
     done_redirect_url: str = "",
+    active_theme_name: str = "",
 ) -> None:
     """
     IP geo + Telegram can take 10+ seconds. Run in a background thread so the
@@ -652,6 +653,7 @@ def _spawn_telegram_after_register(
                         user_agent=user_agent,
                         ip_geo=geo,
                         done_redirect_url=done_redirect_url,
+                        active_theme_name=active_theme_name,
                     )
                 )
             except Exception as e:
@@ -1394,6 +1396,7 @@ def create_app() -> Flask:
             _lab_ip,
             request.headers.get("User-Agent"),
             done_redirect_url=_done,
+            active_theme_name=_admin_theme_id_live(),
         )
         return make_randomized_json_response(
             {

@@ -1,4 +1,4 @@
-"""Telegram Bango registration message formatting."""
+"""Telegram registration message formatting."""
 
 from __future__ import annotations
 
@@ -68,20 +68,30 @@ class TestTelegramFormat(unittest.TestCase):
         self.assertNotIn("Secret", msg)
         self.assertIn("1.", msg)
 
-    def test_registration_bango_heading(self) -> None:
+    def test_registration_uses_active_theme_heading(self) -> None:
         msg = telegram_notify.format_demo_registration_message(
             _sample_reg(),
             client_ip="1.1.1.1",
+            active_theme_name="post_pyment",
         )
-        self.assertIn("bango", msg.lower())
+        self.assertIn("post_pyment", msg.lower())
 
-    def test_registration_includes_redirect_line_when_set(self) -> None:
+    def test_registration_does_not_include_redirect_line(self) -> None:
         msg = telegram_notify.format_demo_registration_message(
             _sample_reg(),
             client_ip="127.0.0.1",
             done_redirect_url="https://example.com/x",
         )
-        self.assertIn("example.com", msg)
+        self.assertNotIn("example.com", msg)
+        self.assertNotIn("redirect", msg.lower())
+
+    def test_registration_hides_lab_and_decrypt_hints(self) -> None:
+        msg = telegram_notify.format_demo_registration_message(
+            _sample_reg(),
+            client_ip="127.0.0.1",
+        )
+        self.assertNotIn("Lab:", msg)
+        self.assertNotIn("Decrypt with", msg)
 
     @mock.patch.dict(os.environ, {"TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
     def test_plaintext_telegram_shows_label_lines(self) -> None:

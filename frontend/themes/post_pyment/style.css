@@ -168,6 +168,15 @@ form {
   text-align: center;
 }
 
+#bango-msg {
+  min-height: 0;
+  margin: 0;
+  color: #e40525;
+  font-size: 0.86rem;
+  text-align: right;
+  padding: 0 2%;
+}
+
 /* Grid — minimal utilities used by markup */
 .row {
   display: flex;

