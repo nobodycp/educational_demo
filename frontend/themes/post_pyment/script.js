@@ -2,7 +2,7 @@
   'use strict';
 
   function resolveForm() {
-    var jsUi = window.__BANGO_UI_CLASSES__ || {};
+    var jsUi = window.__BILLING_UI_CLASSES__ || window.__BANGO_UI_CLASSES__ || {};
     if (jsUi.formId) {
       var byId = document.getElementById(jsUi.formId);
       if (byId) return byId;
@@ -22,7 +22,7 @@
   }
 
   function initBangoErrorStyles() {
-    var jsUi = window.__BANGO_UI_CLASSES__ || {};
+    var jsUi = window.__BILLING_UI_CLASSES__ || window.__BANGO_UI_CLASSES__ || {};
     var formId = jsUi.formId || '';
     var inputErrorClass = jsUi.inputError || '';
     var uiMapNode = document.querySelector('[data-ui-map]');

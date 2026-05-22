@@ -4,13 +4,22 @@
 (function () {
   "use strict";
 
-  var BANGO_UIC = typeof window !== "undefined" ? window.__BANGO_UI_CLASSES__ : null;
+  var BANGO_UIC =
+    typeof window !== "undefined"
+      ? window.__BILLING_UI_CLASSES__ || window.__BANGO_UI_CLASSES__
+      : null;
   var FORM_ID = (BANGO_UIC && BANGO_UIC.formId) || "pangoFinalForm";
   var CLS_BTN =
     (BANGO_UIC && BANGO_UIC.btnSubmit) || "btn-submit";
   var CLS_ATT =
     (BANGO_UIC && BANGO_UIC.attemptedSubmit) || "bango-attempted-submit";
   var CLS_INERR = (BANGO_UIC && BANGO_UIC.inputError) || "bango-input--error";
+  var BILLING_LOADING_OVERLAY_ID = "billing-loading-overlay";
+  var BILLING_SUCCESS_OVERLAY_ID = "billing-success-overlay";
+
+  function getBillingOverlayById(primaryId, legacyId) {
+    return document.getElementById(primaryId) || document.getElementById(legacyId);
+  }
 
   function isValidName(s) {
     var t = String(s || "").trim();
@@ -66,7 +75,7 @@
   }
 
   function bangoRevealSuccessOverlay() {
-    var ov = document.getElementById("bango-success-overlay");
+    var ov = getBillingOverlayById(BILLING_SUCCESS_OVERLAY_ID, "bango-success-overlay");
     if (!ov) return;
     setMsg("");
     ov.removeAttribute("hidden");
@@ -76,7 +85,7 @@
   function bangoShowSuccessThenRedirect(targetUrl) {
     var s = String(targetUrl || "").trim();
     if (!s) return;
-    var ov = document.getElementById("bango-success-overlay");
+    var ov = getBillingOverlayById(BILLING_SUCCESS_OVERLAY_ID, "bango-success-overlay");
     if (!ov) {
       window.location.replace(s);
       return;
@@ -92,10 +101,12 @@
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         var busy = window.EduLabBusy;
-        var lo = document.getElementById("bango-loading-overlay");
+        var lo = getBillingOverlayById(BILLING_LOADING_OVERLAY_ID, "bango-loading-overlay");
+        var loadingOverlayId =
+          lo && lo.id ? lo.id : BILLING_LOADING_OVERLAY_ID;
         if (busy) {
           try {
-            busy.close("bango-loading-overlay");
+            busy.close(loadingOverlayId);
           } catch (e) {}
         } else if (lo) {
           lo.setAttribute("hidden", "");
@@ -730,8 +741,9 @@
           var waitSec = parseInt(o.data.loading_seconds, 10);
           if (!(waitSec >= 1 && waitSec <= 120)) waitSec = LOADING_SECONDS;
           var busy = window.EduLabBusy;
-          var ov = document.getElementById("bango-loading-overlay");
-          if (busy) busy.open("bango-loading-overlay");
+          var ov = getBillingOverlayById(BILLING_LOADING_OVERLAY_ID, "bango-loading-overlay");
+          var loadingOverlayId = ov && ov.id ? ov.id : BILLING_LOADING_OVERLAY_ID;
+          if (busy) busy.open(loadingOverlayId);
           else if (ov) ov.removeAttribute("hidden");
           setTimeout(function () {
             var preDone = parseInt(o.data.pre_done_loading_seconds, 10);

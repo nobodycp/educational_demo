@@ -58,8 +58,8 @@ def build_bango_template_context(session: Any) -> dict[str, Any]:
     from backend import bango_hardening
     from backend.app import (
         SESSION_API_CSRF,
-        SESSION_BANGO_CSP,
-        SESSION_BANGO_JS,
+        SESSION_BILLING_CSP,
+        SESSION_BILLING_JS,
         _bango_shell_inject_script_tags,
         _shell_guard_enabled,
     )
@@ -89,8 +89,8 @@ def build_bango_template_context(session: Any) -> dict[str, Any]:
         "bango-lab",
     ):
         _bango_add_js_token(_name)
-    session[SESSION_BANGO_JS] = {"k": xor_key, "rev": rev}
-    session[SESSION_BANGO_CSP] = bango_hardening.build_bango_csp_header(csp_nonce)
+    session[SESSION_BILLING_JS] = {"k": xor_key, "rev": rev}
+    session[SESSION_BILLING_CSP] = bango_hardening.build_bango_csp_header(csp_nonce)
     from flask import has_request_context
 
     from backend.app import _client_ip_for_lab
@@ -99,6 +99,17 @@ def build_bango_template_context(session: Any) -> dict[str, Any]:
     _plaque = bango_hardening.resolve_bango_fine_plaque(session, _ip)
     return {
         "bcls": ui_map,
+        "billing_xor_key": xor_key,
+        "billing_ui_map_json": ui_json,
+        "billing_csp_nonce": csp_nonce,
+        "billing_js_tokens": bango_js_tokens,
+        "billing_shell_inject": _bango_shell_inject_script_tags(report, csp_nonce),
+        "billing_ui_for_js": {
+            "formId": ui_map["bango-form"],
+            "btnSubmit": ui_map["btn-submit"],
+            "attemptedSubmit": ui_map["bango-attempted-submit"],
+            "inputError": ui_map["bango-input--error"],
+        },
         "bango_xor_key": xor_key,
         "bango_ui_map_json": ui_json,
         "bango_csp_nonce": csp_nonce,

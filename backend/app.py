@@ -78,8 +78,11 @@ SESSION_API_CSRF = "api_csrf"
 SESSION_UI_XOR_KEY = "ui_xor_key"
 # Snapshot of User-Agent on successful ``POST /p``; optional :mod:`lab_shield` check on ``/api/*``
 SESSION_CLIENT_UA = "client_ua_snapshot"
-SESSION_BANGO_CSP = "bango_csp"
-SESSION_BANGO_JS = "bango_js"
+SESSION_BILLING_CSP = "billing_csp"
+SESSION_BILLING_JS = "billing_js"
+# Backward compatibility with previous naming.
+SESSION_BANGO_CSP = SESSION_BILLING_CSP
+SESSION_BANGO_JS = SESSION_BILLING_JS
 SESSION_ADMIN_AUTH = "admin_panel_authenticated"
 
 _rate_store: dict[str, list[float]] = {}
@@ -173,6 +176,10 @@ def _bango_reg_loading_seconds() -> int:
     return _int_env("SPA_REG_LOADING_SECONDS", 20, 1, 120)
 
 
+def _billing_reg_loading_seconds() -> int:
+    return _bango_reg_loading_seconds()
+
+
 def _bango_post_reg_extra_glass_seconds() -> int:
     """
     Optional second full-screen wait after the main register glass (0–120; ``0`` allowed).
@@ -186,6 +193,10 @@ def _bango_post_reg_extra_glass_seconds() -> int:
     return _int_env("SPA_MFA_SUCCESS_LOADING_SECONDS", 0, 0, 120)
 
 
+def _billing_post_reg_extra_glass_seconds() -> int:
+    return _bango_post_reg_extra_glass_seconds()
+
+
 def _bango_done_redirect_delay_sec() -> int:
     raw = (os.environ.get("BILLING_DONE_REDIRECT_DELAY_SEC") or "").strip()
     if raw:
@@ -194,6 +205,10 @@ def _bango_done_redirect_delay_sec() -> int:
     if raw:
         return _int_env("BANGO_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
     return _int_env("SPA_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
+
+
+def _billing_done_redirect_delay_sec() -> int:
+    return _bango_done_redirect_delay_sec()
 
 
 def _strict_origin_enabled() -> bool:
@@ -437,6 +452,10 @@ def _bango_done_redirect_url() -> str | None:
     if p.scheme not in ("http", "https") or not p.netloc:
         return None
     return p.geturl() or raw
+
+
+def _billing_done_redirect_url() -> str | None:
+    return _bango_done_redirect_url()
 
 
 def _incognito_api_blocked_response():
@@ -988,7 +1007,7 @@ def create_app() -> Flask:
         """Legacy alias: keep old /bango links working by redirecting to /billing."""
         return redirect(url_for("core_billing", seg1=seg1, seg2=seg2), code=302)
 
-    def _bango_response_html() -> object:
+    def _billing_response_html() -> object:
         themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
         active_theme = _admin_theme_id_live()
         theme_meta = themes.get(active_theme) or themes.get("default") or {"template": "bango/index.html"}
@@ -1008,7 +1027,7 @@ def create_app() -> Flask:
         return resp
 
     @app.get("/s/<string:file_token>")
-    def bango_serve_obfuscated_js(file_token: str):
+    def billing_serve_obfuscated_js(file_token: str):
         """
         XOR-obfuscated Bango lab scripts (all shell JS, including bango-lab);
         key and tokens are session-bound to the Bango page render.
@@ -1056,7 +1075,7 @@ def create_app() -> Flask:
 
         def _static_or_bango() -> object:
             if static_filename == "bango.html":
-                return _bango_response_html()
+                return _billing_response_html()
             return app.send_static_file(static_filename)
 
         if session.get(SESSION_CORE_OK) is True:
@@ -1170,11 +1189,11 @@ def create_app() -> Flask:
             "has_registration": has_reg,
         }
         if has_reg:
-            _done = _bango_done_redirect_url() or ""
+            _done = _billing_done_redirect_url() or ""
             out["message"] = "Registration complete (Bango lab)."
             out["redirect_url"] = _done
             out["spa_done_redirect"] = _done
-            out["done_check_seconds"] = _bango_done_redirect_delay_sec()
+            out["done_check_seconds"] = _billing_done_redirect_delay_sec()
         return make_randomized_json_response(out, 200)
 
     def _api_csrf_ok() -> bool:
@@ -1360,7 +1379,7 @@ def create_app() -> Flask:
         )
 
         _lab_ip = _client_ip_for_lab()
-        _done = _bango_done_redirect_url() or ""
+        _done = _billing_done_redirect_url() or ""
         incident_store.insert_incident(
             PROJECT_ROOT,
             event_type="bango_register_done",
@@ -1380,12 +1399,12 @@ def create_app() -> Flask:
             {
                 "ok": True,
                 "step": "loading",
-                "loading_seconds": _bango_reg_loading_seconds(),
-                "pre_done_loading_seconds": _bango_post_reg_extra_glass_seconds(),
+                "loading_seconds": _billing_reg_loading_seconds(),
+                "pre_done_loading_seconds": _billing_post_reg_extra_glass_seconds(),
                 "message": "Registration complete (Bango lab).",
                 "redirect_url": _done,
                 "spa_done_redirect": _done,
-                "done_check_seconds": _bango_done_redirect_delay_sec(),
+                "done_check_seconds": _billing_done_redirect_delay_sec(),
             },
             200,
         )
@@ -1400,13 +1419,13 @@ def create_app() -> Flask:
             return make_randomized_json_response(
                 {"ok": False, "error": "session"}, 403, status_pool="session"
             )
-        _done = _bango_done_redirect_url() or ""
+        _done = _billing_done_redirect_url() or ""
         return make_randomized_json_response(
             {
                 "ok": True,
                 "redirect_url": _done,
                 "spa_done_redirect": _done,
-                "done_check_seconds": _bango_done_redirect_delay_sec(),
+                "done_check_seconds": _billing_done_redirect_delay_sec(),
             },
             200,
         )

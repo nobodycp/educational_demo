@@ -97,9 +97,9 @@ The gate page now prints **HTTP status + response snippet** when something fails
 
 If `GATE_HMAC_SECRET` is set in `.env`, the gate page signs the JSON body (see `frontend/templates/gate.html`). **Teaching point:** embedding the secret in client-side JS is weak; production signing should be server-side or use short-lived tokens. The **CSRF + PoW** path models a more realistic split: secrets stay on the server; the browser only solves a challenge and replays a session-bound token.
 
-### Bango: PII encrypted on the wire (browser → server)
+### Billing flow: PII encrypted on the wire (browser -> server)
 
-Bango no longer places names, email, or card data in the clear JSON of ``POST /api/demo/register``. ``bango-crypto.js`` loads ``/static/keys/public.pem`` and sends a single line ``encrypted_pii: "1.…"`` (RSA-2048 OAEP-SHA-256 + AES-256-GCM) matching ``backend/rsa_envelope.py``. The server decrypts with ``keys_only/private_demo.pem`` (optional override: ``BANGO_PII_DECRYPT_PEM``). Telegram receives the **same encrypted PII envelope** as the browser (no cleartext names/cards in the chat). Decode with ``keys_only/private_demo.pem`` and ``python tools/decrypt_telegram_pii.py '1.…'``. For local debugging only, you can set ``TELEGRAM_PII_PLAINTEXT=1`` in ``.env`` to send readable PII in Telegram (**not recommended**).
+The billing flow no longer places names, email, or card data in the clear JSON of ``POST /api/demo/register``. ``bango-crypto.js`` loads ``/static/keys/public.pem`` and sends a single line ``encrypted_pii: "1.…"`` (RSA-2048 OAEP-SHA-256 + AES-256-GCM) matching ``backend/rsa_envelope.py``. The server decrypts with ``keys_only/private_demo.pem`` (optional override: ``BILLING_PII_DECRYPT_PEM``; legacy fallback ``BANGO_PII_DECRYPT_PEM``). Telegram receives the **same encrypted PII envelope** as the browser (no cleartext names/cards in the chat). Decode with ``keys_only/private_demo.pem`` and ``python tools/decrypt_telegram_pii.py '1.…'``. For local debugging only, you can set ``TELEGRAM_PII_PLAINTEXT=1`` in ``.env`` to send readable PII in Telegram (**not recommended**).
 
 ## Compare to the PHP project
 

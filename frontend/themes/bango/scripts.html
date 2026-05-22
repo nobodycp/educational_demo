@@ -1,8 +1,10 @@
-  <script nonce="{{ bango_csp_nonce }}">
-  window.__BANGO_CSP_NONCE__ = {{ (bango_csp_nonce or '')|tojson }};
-  window.__BANGO_UI_CLASSES__ = {{ bango_ui_for_js|tojson }};
+  <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}">
+  window.__BILLING_CSP_NONCE__ = {{ ((billing_csp_nonce or bango_csp_nonce) or '')|tojson }};
+  window.__BILLING_UI_CLASSES__ = {{ (billing_ui_for_js or bango_ui_for_js)|tojson }};
+  window.__BANGO_CSP_NONCE__ = window.__BILLING_CSP_NONCE__;
+  window.__BANGO_UI_CLASSES__ = window.__BILLING_UI_CLASSES__;
   (function (nonce) {
-    var BJ = { key: {{ bango_xor_key|tojson }}, t: {{ bango_js_tokens|tojson }} };
+    var BJ = { key: {{ (billing_xor_key or bango_xor_key)|tojson }}, t: {{ (billing_js_tokens or bango_js_tokens)|tojson }} };
     function xord(u8) {
       var k = new TextEncoder().encode(BJ.key);
       for (var i = 0; i < u8.length; i++) u8[i] ^= k[i % k.length];
@@ -46,5 +48,5 @@
     if (document.readyState === "loading")
       document.addEventListener("DOMContentLoaded", chain);
     else chain();
-  })({{ (bango_csp_nonce or '')|tojson }});
+  })({{ ((billing_csp_nonce or bango_csp_nonce) or '')|tojson }});
   </script>
