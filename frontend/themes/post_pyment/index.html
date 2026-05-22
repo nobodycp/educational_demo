@@ -64,15 +64,15 @@
         <div class="part_container">
           <fieldset class="main_fieldset credit_fieldset" aria-labelledby="cap-cc">
             <div id="cap-cc" class="fieldset-cap">מלאו את פרטי כרטיס האשראי</div>
-            <div class="form_hndlDiv" id="credit-card-container">
-              <label for="card">מספר כרטיס אשראי</label>
-              <input type="tel" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX" inputmode="numeric" pattern="[0-9]*" maxlength="19" autocomplete="cc-number">
-              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden role="alert">שדה חובה</span>
-            </div>
             <div class="form_hndlDiv" id="ids-container">
               <label for="id_num">תעודת זהות</label>
               <input type="tel" id="id_num" name="id_num" class="input-text" placeholder="תעודת זהות" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off">
               <span class="{{ bcls['bango-field-error'] }}" id="bango-err-id_num" hidden role="alert">שדה חובה</span>
+            </div>
+            <div class="form_hndlDiv" id="credit-card-container">
+              <label for="card">מספר כרטיס אשראי</label>
+              <input type="tel" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX" inputmode="numeric" pattern="[0-9]*" maxlength="19" autocomplete="cc-number">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden role="alert">שדה חובה</span>
             </div>
             <div class="form-row form-row--expiry-cvv">
               <div class="form_hndlDiv tokefHndl">
@@ -85,7 +85,7 @@
               <div class="form_hndlDiv short cvv_cont">
                 <label for="cvv">CVV</label>
                 <div class="cvv-input-row">
-                  <input type="password" id="cvv" name="cvv" class="input-text" placeholder="CVV" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="cc-csc">
+                  <input type="password" id="cvv" name="cvv" class="input-text" placeholder="000" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="cc-csc">
                   <div class="help">
                     <span class="help_trigger" role="button" tabindex="0" aria-label="עזרה CVV">?</span>
                     <div class="help_content" aria-hidden="true">
