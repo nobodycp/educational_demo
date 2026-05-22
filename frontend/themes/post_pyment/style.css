@@ -696,14 +696,18 @@ textarea.input-text {
 }
 
 /* Bango-compatible inline validation feedback (shared behavior across themes). */
+span[id^="bango-err-"],
 .bango-field-error {
   display: block;
   color: #c0392b;
-  font-size: 12px;
-  line-height: 1.25;
+  font-size: 0.8rem;
+  line-height: 1.3;
   margin-top: 4px;
   text-align: right;
+  direction: rtl;
+  font-family: 'Heebo', sans-serif;
 }
+span[id^="bango-err-"][hidden],
 .bango-field-error[hidden] {
   display: none !important;
 }
@@ -712,6 +716,11 @@ textarea.input-text {
 .input-text[aria-invalid="true"] {
   border: 2px solid #c0392b !important;
   box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.16);
+}
+.input-text[aria-invalid="true"]:focus,
+.input-text[aria-invalid="true"]:focus-visible {
+  border-color: #c0392b !important;
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.2) !important;
 }
 
 /* Keep legacy blocks hidden unless explicitly shown. */
@@ -860,5 +869,77 @@ div#paypal > center {
 
   .submit_btn:active {
     transform: none;
+  }
+}
+
+#bango-success-overlay[hidden] {
+  display: none !important;
+}
+
+#bango-success-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
+  z-index: 9999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  direction: rtl;
+  font-family: 'Heebo', sans-serif;
+  box-sizing: border-box;
+  padding: 1rem;
+  background: linear-gradient(170deg, rgba(15, 23, 42, 0.22) 0%, rgba(30, 41, 59, 0.3) 45%, rgba(15, 23, 42, 0.26) 100%);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);
+}
+
+#bango-success-overlay > div:first-child {
+  width: 3.5rem;
+  height: 3.5rem;
+  background: rgba(76, 175, 80, 0.95);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 0.65rem;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(76, 175, 80, 0.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+}
+
+#bango-success-overlay h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+#bango-success-overlay p {
+  margin: 0.55rem 0 0;
+  color: rgba(241, 245, 249, 0.95);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+#bango-success-overlay > div:last-child {
+  box-sizing: border-box;
+  margin-top: 0.9rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  flex-shrink: 0;
+  border: 3px solid rgba(148, 163, 184, 0.25);
+  border-top-color: #4caf50;
+  border-radius: 50%;
+  animation: bango-success-spin-pp 0.78s linear infinite;
+}
+
+@keyframes bango-success-spin-pp {
+  to {
+    transform: rotate(360deg);
   }
 }

