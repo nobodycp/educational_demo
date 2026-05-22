@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Settings</title>
+  <link rel="stylesheet" href="/static/css/lab-theme.css" />
+  <style>
+    .admin-card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background: #fff; }
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem 1rem; }
+    .admin-field { display: flex; flex-direction: column; gap: 0.35rem; }
+    .admin-field input[type="text"], .admin-field input[type="password"], .admin-field select { padding: 0.45rem; }
+  </style>
+</head>
+<body class="lab-page">
+  <div class="lab-root">
+    <div class="lab-root-inner" style="max-width: 1080px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <h1 style="margin:0;">Admin Settings Panel</h1>
+        <form method="post" action="/admin/logout">
+          <button type="submit">Logout</button>
+        </form>
+      </div>
+      <p style="margin-top:0.3rem;color:#555;">Access mode: <strong>{{ access_mode }}</strong></p>
+      {% if notice %}<p style="color:#166534;">{{ notice }}</p>{% endif %}
+      {% if error %}<p style="color:#b91c1c;">{{ error }}</p>{% endif %}
+
+      <form method="post" action="/admin/settings">
+        <div class="admin-card">
+          <h2 style="margin-top:0;">Theme Selector</h2>
+          <div class="admin-field" style="max-width:360px;">
+            <label for="ACTIVE_THEME">ACTIVE_THEME</label>
+            <select id="ACTIVE_THEME" name="ACTIVE_THEME">
+              {% for key, t in themes.items() %}
+                <option value="{{ key }}" {% if key == active_theme %}selected{% endif %}>{{ key }} - {{ t.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <p style="margin-bottom:0;color:#555;">Theme impacts only data-entry UI. Backend validation and security stay shared.</p>
+        </div>
+
+        {% for group_name, entries in grouped.items() %}
+          {% if group_name != "admin" %}
+          <div class="admin-card">
+            <h2 style="margin-top:0;">{{ group_name|capitalize }}</h2>
+            <div class="admin-grid">
+              {% for key, meta in entries.items() %}
+                {% if key != "ACTIVE_THEME" %}
+                <div class="admin-field">
+                  <label for="{{ key }}">{{ key }}</label>
+                  {% if key in bool_keys %}
+                    <label style="display:flex;align-items:center;gap:0.4rem;">
+                      <input id="{{ key }}" name="{{ key }}" type="checkbox" value="1" {% if meta.value|lower in ['1','true','yes','on'] %}checked{% endif %} />
+                      enabled
+                    </label>
+                  {% else %}
+                    <input
+                      id="{{ key }}"
+                      name="{{ key }}"
+                      type="{% if meta.sensitive %}password{% else %}text{% endif %}"
+                      value="{% if not meta.sensitive %}{{ meta.value }}{% endif %}"
+                      placeholder="{% if meta.sensitive %}{{ meta.masked }} (leave blank to keep){% endif %}"
+                    />
+                  {% endif %}
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+
+        <div class="admin-card" style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button type="submit" name="action" value="save">Save .env</button>
+          <button type="submit" name="action" value="apply">Apply (Save + redeploy reminder)</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

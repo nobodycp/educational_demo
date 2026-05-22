@@ -1,0 +1,12 @@
+{
+  "themes": {
+    "default": {
+      "label": "Default Bango",
+      "template": "bango.html"
+    },
+    "compact": {
+      "label": "Compact Bango",
+      "template": "bango_compact.html"
+    }
+  }
+}
