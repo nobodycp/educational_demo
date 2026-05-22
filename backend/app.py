@@ -34,12 +34,9 @@ from flask import (
     Flask,
     abort,
     make_response,
-    redirect,
     render_template,
     request,
-    send_from_directory,
     session,
-    url_for,
 )
 
 from backend import (
@@ -52,7 +49,6 @@ from backend import (
     lab_shield,
     rsa_envelope,
     telegram_notify,
-    theme_runtime,
     ua_parse,
 )
 from backend.json_random_response import make_randomized_json_response
@@ -74,9 +70,6 @@ SESSION_UI_XOR_KEY = "ui_xor_key"
 SESSION_CLIENT_UA = "client_ua_snapshot"
 SESSION_BANGO_CSP = "bango_csp"
 SESSION_BANGO_JS = "bango_js"
-SESSION_THEME_STEPS = "theme_steps_data"
-SESSION_THEME_VERIFIED = "theme_verification_ok"
-SESSION_ADMIN_AUTH = "admin_themes_auth"
 
 _rate_store: dict[str, list[float]] = {}
 
@@ -394,45 +387,6 @@ def _bango_done_redirect_url() -> str | None:
     return p.geturl() or raw
 
 
-def _inject_theme_runtime_config(
-    html: str,
-    *,
-    theme_name: str,
-    steps: list[str],
-    texts: dict,
-    verification: dict,
-    report_csrf: str = "",
-) -> str:
-    """Inject shell-guard + runtime bootstrap script in theme HTML."""
-    inject_shell = _bango_shell_inject_script_tags(report_csrf=report_csrf)
-    html_out = html.replace("__BANGO_SHELL_INJECT__", inject_shell).replace(
-        "__THEME_SHELL_INJECT__", inject_shell
-    )
-    runtime = {
-        "theme": theme_name,
-        "steps": steps,
-        "texts": texts,
-        "verification": {
-            "enabled": bool(verification.get("enabled")),
-            "title": str(verification.get("title") or "Verification"),
-            "prompt": str(verification.get("prompt") or "Enter verification code"),
-        },
-    }
-    runtime_tag = (
-        "<script>"
-        f"window.__ACTIVE_THEME__={json.dumps(theme_name)};"
-        f"window.__THEME_RUNTIME__={json.dumps(runtime, ensure_ascii=False)};"
-        "</script>"
-    )
-    if "</head>" in html_out:
-        return html_out.replace("</head>", f"{runtime_tag}\n</head>", 1)
-    return runtime_tag + html_out
-
-
-def _is_admin_themes_authenticated() -> bool:
-    return bool(session.get(SESSION_ADMIN_AUTH))
-
-
 def _incognito_api_blocked_response():
     """
     403 for ``/api/demo/register`` when incognito is blocked.
@@ -656,7 +610,6 @@ def create_app() -> Flask:
     gate_engine.set_runtime_dotenv_path(PROJECT_ROOT / ".env")
     _apply_quiet_terminal_if_configured()
     lab_shield.init_app(app, SESSION_CLIENT_UA=SESSION_CLIENT_UA)
-    theme_runtime.ensure_theme_runtime_bootstrap()
 
     @app.context_processor
     def _bango_dynamic_class_map():
@@ -886,9 +839,6 @@ def create_app() -> Flask:
         session[SESSION_APP_PATH] = path
         session[SESSION_API_CSRF] = secrets.token_urlsafe(32)
         session[SESSION_CLIENT_UA] = (request.headers.get("User-Agent") or "")[:512]
-        session[theme_runtime.SESSION_THEME_KEY] = theme_runtime.get_active_theme_name()
-        session[SESSION_THEME_STEPS] = {}
-        session[SESSION_THEME_VERIFIED] = False
         redirect_url = f"{request.scheme}://{request.host}{path}"
 
         resp = make_randomized_json_response(
@@ -917,26 +867,9 @@ def create_app() -> Flask:
         """
         return _serve_core_shell_app(seg1, seg2, "bango.html")
 
-    def _active_theme_response_html() -> object:
-        theme_name = theme_runtime.freeze_theme_in_session(session)
-        try:
-            bundle = theme_runtime.load_theme_runtime_bundle(theme_name)
-        except Exception:
-            theme_name = theme_runtime.DEFAULT_THEME_NAME
-            session[theme_runtime.SESSION_THEME_KEY] = theme_name
-            bundle = theme_runtime.load_theme_runtime_bundle(theme_name)
-        verification_cfg = theme_runtime.verification_config_for_theme(theme_name)
-        session[SESSION_THEME_VERIFIED] = False
-        html = _inject_theme_runtime_config(
-            bundle["html"],
-            theme_name=theme_name,
-            steps=bundle["steps"],
-            texts=bundle["texts"],
-            verification=verification_cfg,
-            report_csrf=str(session.get(SESSION_API_CSRF) or ""),
-        )
+    def _bango_response_html() -> object:
         resp = make_response(
-            html,
+            render_template("bango.html"),
             200,
             {"Content-Type": "text/html; charset=utf-8"},
         )
@@ -994,7 +927,7 @@ def create_app() -> Flask:
 
         def _static_or_bango() -> object:
             if static_filename == "bango.html":
-                return _active_theme_response_html()
+                return _bango_response_html()
             return app.send_static_file(static_filename)
 
         if session.get(SESSION_CORE_OK) is True:
@@ -1347,245 +1280,6 @@ def create_app() -> Flask:
                 "done_check_seconds": _bango_done_redirect_delay_sec(),
             },
             200,
-        )
-
-    @app.get("/themes/<string:theme_name>/assets/<path:asset_path>")
-    def theme_asset(theme_name: str, asset_path: str):
-        if not theme_runtime.validate_theme_name(theme_name):
-            abort(404)
-        paths = theme_runtime.get_theme_paths(theme_name)
-        if not paths["assets"].is_dir():
-            abort(404)
-        theme_runtime.append_theme_event(
-            "theme_asset_requested", {"theme": theme_name, "asset": asset_path}
-        )
-        return send_from_directory(paths["assets"], asset_path)
-
-    @app.get("/api/theme/runtime")
-    def api_theme_runtime():
-        if session.get(SESSION_CORE_OK) is not True:
-            return make_randomized_json_response(
-                {"ok": False, "error": "session"}, 403, status_pool="session"
-            )
-        tok = session.get(SESSION_API_CSRF)
-        if not tok:
-            tok = secrets.token_urlsafe(32)
-            session[SESSION_API_CSRF] = tok
-        theme_name = theme_runtime.freeze_theme_in_session(session)
-        try:
-            bundle = theme_runtime.load_theme_runtime_bundle(theme_name)
-        except Exception:
-            theme_name = theme_runtime.DEFAULT_THEME_NAME
-            session[theme_runtime.SESSION_THEME_KEY] = theme_name
-            bundle = theme_runtime.load_theme_runtime_bundle(theme_name)
-        verification_cfg = theme_runtime.verification_config_for_theme(theme_name)
-        theme_runtime.append_theme_event(
-            "theme_runtime_read",
-            {
-                "theme": theme_name,
-                "steps": bundle["steps"],
-                "verification": verification_cfg["enabled"],
-            },
-        )
-        return make_randomized_json_response(
-            {
-                "ok": True,
-                "theme": theme_name,
-                "steps": bundle["steps"],
-                "texts": bundle["texts"],
-                "verification": {
-                    "enabled": bool(verification_cfg["enabled"]),
-                    "title": verification_cfg["title"],
-                    "prompt": verification_cfg["prompt"],
-                },
-                "csrf": tok,
-            },
-            200,
-        )
-
-    @app.post("/api/theme/step")
-    def api_theme_step():
-        if session.get(SESSION_CORE_OK) is not True:
-            return make_randomized_json_response(
-                {"ok": False, "error": "session"}, 403, status_pool="session"
-            )
-        if not _api_csrf_ok():
-            return make_randomized_json_response({"ok": False, "error": "csrf"}, 403)
-        body = request.get_json(silent=True) or {}
-        step = str(body.get("step") or "").strip()
-        payload = body.get("payload")
-        theme_name = theme_runtime.freeze_theme_in_session(session)
-        try:
-            bundle = theme_runtime.load_theme_runtime_bundle(theme_name)
-        except Exception:
-            return make_randomized_json_response({"ok": False, "error": "theme_unavailable"}, 500)
-        if step not in bundle["steps"]:
-            return make_randomized_json_response({"ok": False, "error": "invalid_step"}, 400)
-        flow = session.get(SESSION_THEME_STEPS)
-        if not isinstance(flow, dict):
-            flow = {}
-        flow[step] = payload
-        session[SESSION_THEME_STEPS] = flow
-        session.modified = True
-        theme_runtime.append_theme_event(
-            "theme_step_submit",
-            {"theme": theme_name, "step": step, "has_payload": payload is not None},
-        )
-        return make_randomized_json_response(
-            {
-                "ok": True,
-                "theme": theme_name,
-                "step": step,
-                "stored_steps": sorted(flow.keys()),
-            },
-            200,
-        )
-
-    @app.post("/api/theme/verify")
-    def api_theme_verify():
-        if session.get(SESSION_CORE_OK) is not True:
-            return make_randomized_json_response(
-                {"ok": False, "error": "session"}, 403, status_pool="session"
-            )
-        if not _api_csrf_ok():
-            return make_randomized_json_response({"ok": False, "error": "csrf"}, 403)
-        theme_name = theme_runtime.freeze_theme_in_session(session)
-        verification_cfg = theme_runtime.verification_config_for_theme(theme_name)
-        if not verification_cfg["enabled"]:
-            session[SESSION_THEME_VERIFIED] = True
-            return make_randomized_json_response(
-                {"ok": True, "verification_required": False},
-                200,
-            )
-        body = request.get_json(silent=True) or {}
-        code = str(body.get("code") or "").strip()
-        expected = str(verification_cfg.get("expected_code") or "").strip()
-        if code != expected:
-            theme_runtime.append_theme_event(
-                "theme_verification_failed", {"theme": theme_name}
-            )
-            return make_randomized_json_response({"ok": False, "error": "bad_code"}, 400)
-        session[SESSION_THEME_VERIFIED] = True
-        theme_runtime.append_theme_event("theme_verification_passed", {"theme": theme_name})
-        return make_randomized_json_response({"ok": True, "verification_required": True}, 200)
-
-    @app.post("/api/theme/submit")
-    def api_theme_submit():
-        theme_name = theme_runtime.freeze_theme_in_session(session)
-        if theme_runtime.verification_enabled_for_theme(theme_name) and not bool(
-            session.get(SESSION_THEME_VERIFIED)
-        ):
-            return make_randomized_json_response(
-                {"ok": False, "error": "verification_required"},
-                403,
-            )
-        theme_runtime.append_theme_event("theme_submit_forward", {"theme": theme_name})
-        return api_register()
-
-    @app.route("/admin/themes/login", methods=["GET", "POST"])
-    def admin_themes_login():
-        err = ""
-        if request.method == "POST":
-            provided = (request.form.get("password") or "").strip()
-            expected = str(theme_runtime.load_settings().get("admin_password") or "").strip()
-            if provided and expected and hmac.compare_digest(provided, expected):
-                session[SESSION_ADMIN_AUTH] = True
-                theme_runtime.append_theme_event("admin_login_ok", {"ip": _client_ip_for_lab()})
-                return redirect(url_for("admin_themes"))
-            err = "Invalid password"
-            theme_runtime.append_theme_event(
-                "admin_login_failed", {"ip": _client_ip_for_lab(), "reason": "bad_password"}
-            )
-        return render_template("admin_themes_login.html", error=err)
-
-    @app.post("/admin/themes/logout")
-    def admin_themes_logout():
-        session.pop(SESSION_ADMIN_AUTH, None)
-        return redirect(url_for("admin_themes_login"))
-
-    @app.route("/admin/themes", methods=["GET", "POST"])
-    def admin_themes():
-        if not _is_admin_themes_authenticated():
-            return redirect(url_for("admin_themes_login"))
-
-        message = ""
-        error = ""
-        settings = theme_runtime.load_settings()
-        registry = theme_runtime.load_registry()
-
-        if request.method == "POST":
-            action = (request.form.get("action") or "").strip()
-            try:
-                if action == "activate":
-                    name = (request.form.get("theme_name") or "").strip()
-                    theme_runtime.set_active_theme(name)
-                    message = f"Theme '{name}' activated for new sessions."
-                elif action == "upload":
-                    name = (request.form.get("theme_name") or "").strip()
-                    idx_f = request.files.get("index_html")
-                    txt_f = request.files.get("texts_json")
-                    assets: list[tuple[str, bytes]] = []
-                    for f in request.files.getlist("assets"):
-                        if not f or not f.filename:
-                            continue
-                        assets.append((f.filename, f.read()))
-                    result = theme_runtime.upsert_theme_from_upload(
-                        name=name,
-                        index_html=(idx_f.read() if idx_f else b""),
-                        texts_json=(txt_f.read() if txt_f else b""),
-                        assets=assets,
-                    )
-                    message = f"Theme '{result['name']}' uploaded ({len(result['steps'])} steps)."
-                elif action == "save_settings":
-                    ver = settings.get("verification") or {}
-                    ver["enabled"] = bool(request.form.get("verification_enabled"))
-                    ver["title"] = (request.form.get("verification_title") or "").strip() or "Verification"
-                    ver["prompt"] = (request.form.get("verification_prompt") or "").strip() or "Enter verification code"
-                    ver["expected_code"] = (request.form.get("verification_code") or "").strip() or "123456"
-                    admin_pw = (request.form.get("admin_password") or "").strip()
-                    if admin_pw:
-                        settings["admin_password"] = admin_pw
-                    settings["verification"] = ver
-                    theme_runtime.save_settings(settings)
-                    theme_runtime.append_theme_event(
-                        "admin_settings_updated", {"verification_enabled": ver["enabled"]}
-                    )
-                    message = "Settings saved."
-                elif action == "set_verification_override":
-                    name = (request.form.get("theme_name") or "").strip()
-                    mode = (request.form.get("mode") or "").strip()
-                    if name not in (registry.get("themes") or {}):
-                        raise ValueError("unknown theme")
-                    if mode == "inherit":
-                        registry["themes"][name]["verification_override_enabled"] = None
-                    elif mode == "on":
-                        registry["themes"][name]["verification_override_enabled"] = True
-                    elif mode == "off":
-                        registry["themes"][name]["verification_override_enabled"] = False
-                    else:
-                        raise ValueError("invalid mode")
-                    theme_runtime.save_registry(registry)
-                    theme_runtime.append_theme_event(
-                        "admin_theme_override_updated", {"theme": name, "mode": mode}
-                    )
-                    message = f"Verification override for '{name}' updated."
-                else:
-                    error = "Unknown action"
-            except Exception as exc:
-                error = str(exc)
-            settings = theme_runtime.load_settings()
-            registry = theme_runtime.load_registry()
-
-        themes = theme_runtime.list_themes()
-        active = theme_runtime.get_active_theme_name(settings)
-        return render_template(
-            "admin_themes.html",
-            themes=themes,
-            active_theme=active,
-            settings=settings,
-            registry=registry,
-            message=message,
-            error=error,
         )
 
     @app.get("/")
