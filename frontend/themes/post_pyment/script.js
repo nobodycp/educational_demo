@@ -1,6 +1,26 @@
 (function () {
   'use strict';
 
+  function resolveForm() {
+    var jsUi = window.__BANGO_UI_CLASSES__ || {};
+    if (jsUi.formId) {
+      var byId = document.getElementById(jsUi.formId);
+      if (byId) return byId;
+    }
+    return document.querySelector('form.Yform') || null;
+  }
+
+  function initSubmitGuard() {
+    var form = resolveForm();
+    if (!form || form.getAttribute('data-post-pyment-guard') === '1') return;
+    form.setAttribute('data-post-pyment-guard', '1');
+
+    // Prevent fallback GET query-string submit when bango-lab is delayed/not loaded.
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+    });
+  }
+
   function initBangoErrorStyles() {
     var jsUi = window.__BANGO_UI_CLASSES__ || {};
     var formId = jsUi.formId || '';
@@ -119,9 +139,16 @@
     });
   }
 
-  window.addEventListener('load', function () {
+  function boot() {
+    initSubmitGuard();
     initBangoErrorStyles();
     initFieldConstraints();
     initCvvTooltip();
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
