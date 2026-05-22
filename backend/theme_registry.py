@@ -9,14 +9,6 @@ DEFAULT_THEMES = {
         "label": "Default Bango",
         "template": "bango/index.html",
     },
-    "compact": {
-        "label": "Compact Bango",
-        "template": "compact/index.html",
-    },
-    "clear": {
-        "label": "Clear Inputs",
-        "template": "clear/index.html",
-    },
     "post_pyment": {
         "label": "Post Payment",
         "template": "post_pyment/index.html",

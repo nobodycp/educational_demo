@@ -45,12 +45,12 @@ class TestAdminEnv(unittest.TestCase):
             override = root / "data" / "admin_runtime.env"
             primary.write_text("ACTIVE_THEME=default\n", encoding="utf-8")
             saved_keys, target = admin_env.write_env_values_with_fallback(
-                primary, override, {"ACTIVE_THEME": "clear"}
+                primary, override, {"ACTIVE_THEME": "post_pyment"}
             )
             self.assertEqual(saved_keys, ["ACTIVE_THEME"])
             self.assertEqual(target, primary)
             merged = admin_env.read_env_values_merged(primary, override, keys={"ACTIVE_THEME"})
-            self.assertEqual(merged["ACTIVE_THEME"], "clear")
+            self.assertEqual(merged["ACTIVE_THEME"], "post_pyment")
 
             primary.unlink()
             saved_keys2, target2 = admin_env.write_env_values_with_fallback(

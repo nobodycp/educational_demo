@@ -25,7 +25,7 @@ class TestAdminPanel(unittest.TestCase):
             """{
   "themes": {
     "default": {"label": "Default Bango", "template": "bango/index.html"},
-    "compact": {"label": "Compact Bango", "template": "compact/index.html"}
+    "post_pyment": {"label": "Post Payment", "template": "post_pyment/index.html"}
   }
 }""",
             encoding="utf-8",
@@ -73,7 +73,7 @@ class TestAdminPanel(unittest.TestCase):
             "/admin/settings",
             data={
                 "action": "save",
-                "ACTIVE_THEME": "compact",
+                "ACTIVE_THEME": "post_pyment",
                 "TELEGRAM_CHAT_ID": "123456",
                 "COOKIE_SECURE": "1",
             },
@@ -81,7 +81,7 @@ class TestAdminPanel(unittest.TestCase):
         )
         self.assertEqual(r_save.status_code, 200)
         txt = self.env_path.read_text(encoding="utf-8")
-        self.assertIn("ACTIVE_THEME=compact", txt)
+        self.assertIn("ACTIVE_THEME=post_pyment", txt)
         self.assertIn("TELEGRAM_CHAT_ID=123456", txt)
         self.assertIn("COOKIE_SECURE=1", txt)
 
@@ -105,7 +105,7 @@ class TestAdminPanel(unittest.TestCase):
     def test_theme_selection_reflected_in_bango_render(self) -> None:
         txt = self.env_path.read_text(encoding="utf-8")
         self.env_path.write_text(
-            txt.replace("ACTIVE_THEME=default", "ACTIVE_THEME=compact"),
+            txt.replace("ACTIVE_THEME=default", "ACTIVE_THEME=post_pyment"),
             encoding="utf-8",
         )
         c = self.app.test_client()
@@ -115,7 +115,7 @@ class TestAdminPanel(unittest.TestCase):
             sess[app_mod.SESSION_APP_PATH] = "/a/b/bango"
         r = c.get("/a/b/bango")
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b"theme: compact", r.data)
+        self.assertIn(b"post_pyment", r.data)
 
     def test_register_validation_regression_phone_error(self) -> None:
         c = self.app.test_client()
