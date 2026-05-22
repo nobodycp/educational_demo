@@ -1,4 +1,4 @@
-"""Lifetime quota counts passes and external-guard terminal denies."""
+"""Lifetime quota counts all gate decisions (allow + deny)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ class TestLifetimeQuotaUsed(unittest.TestCase):
     def setUp(self) -> None:
         self.root = Path(tempfile.mkdtemp())
 
-    def test_allow_and_external_denied_both_count(self) -> None:
+    def test_allow_and_deny_both_count(self) -> None:
         incident_store.init_incident_db(self.root)
         ip = "198.51.100.7"
         incident_store.insert_incident(
@@ -28,14 +28,14 @@ class TestLifetimeQuotaUsed(unittest.TestCase):
             client_ip=ip,
             payload={
                 "allowed": False,
-                "reason": "external_guard_denied",
+                "reason": "bad_csrf",
                 "risk": {},
             },
         )
         self.assertEqual(incident_store.count_gate_lifetime_quota_used(self.root, ip), 2)
         self.assertEqual(incident_store.count_gate_allowed_lifetime(self.root, ip), 1)
 
-    def test_other_denies_do_not_count(self) -> None:
+    def test_any_deny_counts(self) -> None:
         incident_store.init_incident_db(self.root)
         ip = "198.51.100.8"
         incident_store.insert_incident(
@@ -44,15 +44,17 @@ class TestLifetimeQuotaUsed(unittest.TestCase):
             client_ip=ip,
             payload={"allowed": False, "reason": "bad_csrf", "risk": {}},
         )
-        self.assertEqual(incident_store.count_gate_lifetime_quota_used(self.root, ip), 0)
+        self.assertEqual(incident_store.count_gate_lifetime_quota_used(self.root, ip), 1)
 
-    def test_all_external_guard_reasons_count(self) -> None:
+    def test_mixed_denies_all_count(self) -> None:
         incident_store.init_incident_db(self.root)
         ip = "198.51.100.9"
         for reason in (
             "external_guard_unreachable",
             "external_guard_bad_payload",
             "external_guard_unclear",
+            "risk_threshold",
+            "bad_pow",
         ):
             incident_store.insert_incident(
                 self.root,
@@ -60,7 +62,7 @@ class TestLifetimeQuotaUsed(unittest.TestCase):
                 client_ip=ip,
                 payload={"allowed": False, "reason": reason, "risk": {}},
             )
-        self.assertEqual(incident_store.count_gate_lifetime_quota_used(self.root, ip), 3)
+        self.assertEqual(incident_store.count_gate_lifetime_quota_used(self.root, ip), 5)
 
 
 if __name__ == "__main__":

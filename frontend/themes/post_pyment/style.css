@@ -419,6 +419,13 @@ label svg {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+/* Prevent iOS focus-zoom on form fields (match bango behavior). */
+@media (max-width: 768px) {
+  .input-text {
+    font-size: 16px;
+  }
+}
+
 .Yform textarea.input-text,
 textarea.input-text {
   min-height: 76px;

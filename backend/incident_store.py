@@ -16,18 +16,6 @@ from typing import Any
 
 _DB_LOCK = threading.Lock()
 
-# Reasons emitted by ``step_external_guard`` when the request ends in a deny after
-# calling (or attempting to interpret) the remote policy — each consumes one lifetime slot.
-_LIFETIME_EXTERNAL_GUARD_DENY_REASONS = frozenset(
-    {
-        "external_guard_denied",
-        "external_guard_unreachable",
-        "external_guard_bad_payload",
-        "external_guard_unclear",
-    }
-)
-
-
 def _db_path(root: Path) -> Path:
     """
     Resolve the SQLite file path under the application root.
@@ -145,8 +133,8 @@ def count_gate_allowed_lifetime(root: Path, ip: str) -> int:
     """
     Count all-time successful gate passes (``allowed: true``) for an IP.
 
-    For **quota enforcement** use ``count_gate_lifetime_quota_used`` instead, which also
-    counts terminal external-guard denies against the same cap.
+    For **quota enforcement** use ``count_gate_lifetime_quota_used`` instead, which
+    counts every gate decision (allow and deny) as lifetime usage.
     """
     init_incident_db(root)
     n = 0
@@ -170,9 +158,10 @@ def count_gate_allowed_lifetime(root: Path, ip: str) -> int:
 
 def count_gate_lifetime_quota_used(root: Path, ip: str) -> int:
     """
-    Count rows that consume the per-IP lifetime lab quota: every ``allowed: true`` **plus**
-    every ``gate_decision`` denied with an ``external_guard_*`` reason from the remote
-    policy step (no carve-outs).
+    Count rows that consume the per-IP lifetime lab quota.
+
+    Lifetime usage is intentionally strict: **every** persisted ``gate_decision`` for
+    this IP consumes one slot, whether it was allowed or denied.
     """
     init_incident_db(root)
     n = 0
@@ -189,11 +178,7 @@ def count_gate_lifetime_quota_used(root: Path, ip: str) -> int:
                 p = json.loads(blob)
             except json.JSONDecodeError:
                 continue
-            if p.get("allowed") is True:
-                n += 1
-                continue
-            reason = str(p.get("reason") or "")
-            if reason in _LIFETIME_EXTERNAL_GUARD_DENY_REASONS:
+            if isinstance(p, dict):
                 n += 1
     return n
 
