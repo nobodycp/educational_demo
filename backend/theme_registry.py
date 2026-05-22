@@ -7,15 +7,19 @@ from typing import Any
 DEFAULT_THEMES = {
     "default": {
         "label": "Default Bango",
-        "template": "bango.html",
+        "template": "bango/index.html",
     },
     "compact": {
         "label": "Compact Bango",
-        "template": "bango_compact.html",
+        "template": "compact/index.html",
     },
     "clear": {
         "label": "Clear Inputs",
-        "template": "bango.html",
+        "template": "clear/index.html",
+    },
+    "post_pyment": {
+        "label": "Post Payment",
+        "template": "post_pyment/index.html",
     },
 }
 

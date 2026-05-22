@@ -33,6 +33,7 @@ import secrets
 import threading
 from urllib.parse import urlparse
 
+from jinja2 import ChoiceLoader, FileSystemLoader
 from flask import (
     Flask,
     abort,
@@ -40,6 +41,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
 )
@@ -654,6 +656,13 @@ def create_app() -> Flask:
         static_folder=str(FRONTEND_DIR / "static"),
         template_folder=str(FRONTEND_DIR / "templates"),
     )
+    # Allow rendering templates from frontend/themes/<theme>/index.html
+    app.jinja_loader = ChoiceLoader(
+        [
+            app.jinja_loader,
+            FileSystemLoader(str(FRONTEND_DIR / "themes")),
+        ]
+    )
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
@@ -918,15 +927,15 @@ def create_app() -> Flask:
     @app.route("/<string:seg1>/<string:seg2>/bango")
     def core_bango(seg1: str, seg2: str):
         """
-        Shell after gate: ``bango.html`` (RTL lab UI) with HttpOnly one-time handoff.
+        Shell after gate: theme-driven Bango UI with HttpOnly one-time handoff.
         """
         return _serve_core_shell_app(seg1, seg2, "bango.html")
 
     def _bango_response_html() -> object:
         themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
         active_theme = _admin_theme_id_live()
-        theme_meta = themes.get(active_theme) or themes.get("default") or {"template": "bango.html"}
-        template_name = str(theme_meta.get("template") or "bango.html")
+        theme_meta = themes.get(active_theme) or themes.get("default") or {"template": "bango/index.html"}
+        template_name = str(theme_meta.get("template") or "bango/index.html")
         resp = make_response(
             render_template(
                 template_name,
@@ -1344,6 +1353,14 @@ def create_app() -> Flask:
             },
             200,
         )
+
+    @app.get("/theme-assets/<string:theme_name>/<path:filename>")
+    def theme_asset(theme_name: str, filename: str):
+        themes_root = FRONTEND_DIR / "themes"
+        theme_dir = themes_root / theme_name
+        if not theme_dir.is_dir():
+            abort(404)
+        return send_from_directory(theme_dir, filename)
 
     @app.route("/admin/login", methods=["GET", "POST"])
     def admin_login():

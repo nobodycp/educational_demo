@@ -23,8 +23,8 @@ class TestAdminPanel(unittest.TestCase):
         cls.theme_registry_path.write_text(
             """{
   "themes": {
-    "default": {"label": "Default Bango", "template": "bango.html"},
-    "compact": {"label": "Compact Bango", "template": "bango_compact.html"}
+    "default": {"label": "Default Bango", "template": "bango/index.html"},
+    "compact": {"label": "Compact Bango", "template": "compact/index.html"}
   }
 }""",
             encoding="utf-8",

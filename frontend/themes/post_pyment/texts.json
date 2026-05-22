@@ -1,0 +1,38 @@
+{
+  "title": "סיום הזמנה",
+  "order_summary": "סיכום הזמנה — סכום לתשלום: 7.99 ₪",
+  "server_error": "שגיאה בטיפול בבקשה. נסה שוב.",
+  "order_details": "פרטי ההזמנה",
+  "customer_details": "פרטי לקוח",
+  "payment_details": "פרטי תשלום",
+  "labels": {
+    "order_id": "מספר הזמנה",
+    "fname": "שם פרטי",
+    "lname": "שם משפחה",
+    "phone": "מספר טלפון נייד",
+    "email": "דוא\"ל",
+    "cc": "מספר כרטיס אשראי",
+    "id_num": "תעודת זהות",
+    "expiry": "תוקף הכרטיס",
+    "cvv": "CVV"
+  },
+  "placeholders": {
+    "fname": "שם פרטי",
+    "lname": "שם משפחה",
+    "phone": "050-000-0000",
+    "email": "דוא\"ל",
+    "cc": "XXXX XXXX XXXX XXXX",
+    "id_num": "תעודת זהות",
+    "expiry": "MM/YY",
+    "cvv": "CVV"
+  },
+  "errors": {
+    "id_error": "יש להזין מספר ת.ז. תקין",
+    "cc_error": "יש להזין מספר כרטיס אשראי תקין",
+    "cvv_error": "יש להזין מספר CVV תקין",
+    "general": "הזן את המידע כהלכה"
+  },
+  "submit_button": "אישור תשלום",
+  "security_label": "אבטחת מידע:"
+}
+
