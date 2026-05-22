@@ -83,6 +83,32 @@ SESSION_BANGO_JS = "bango_js"
 SESSION_ADMIN_AUTH = "admin_panel_authenticated"
 
 _rate_store: dict[str, list[float]] = {}
+_RUNTIME_SECRET_CACHE: dict[str, str] = {}
+_SECRET_PLACEHOLDERS: set[str] = {
+    "change-this-to-a-long-random-string",
+    "demo-handoff-pepper-change-me",
+    "change-me-in-dotenv",
+    "dev-only-change-me",
+}
+
+
+def _runtime_secret_env(name: str, *, nbytes: int = 32) -> str:
+    """
+    Return a stable per-process random secret when env value is empty/placeholder.
+
+    This removes the need to manually edit secrets in local labs while keeping one
+    constant value for the running process lifetime.
+    """
+    raw = (os.environ.get(name) or "").strip()
+    if raw and raw not in _SECRET_PLACEHOLDERS:
+        return raw
+    cached = _RUNTIME_SECRET_CACHE.get(name)
+    if cached:
+        return cached
+    generated = secrets.token_urlsafe(nbytes)
+    _RUNTIME_SECRET_CACHE[name] = generated
+    os.environ[name] = generated
+    return generated
 
 
 def _start_debug_key() -> str:
@@ -138,6 +164,9 @@ def _int_env(name: str, default: int, min_v: int, max_v: int) -> int:
 
 def _bango_reg_loading_seconds() -> int:
     """Full-screen glass after successful register, before optional extra glass / success UI."""
+    raw = (os.environ.get("BILLING_REG_LOADING_SECONDS") or "").strip()
+    if raw:
+        return _int_env("BILLING_REG_LOADING_SECONDS", 20, 1, 120)
     raw = (os.environ.get("BANGO_REG_LOADING_SECONDS") or "").strip()
     if raw:
         return _int_env("BANGO_REG_LOADING_SECONDS", 20, 1, 120)
@@ -148,6 +177,9 @@ def _bango_post_reg_extra_glass_seconds() -> int:
     """
     Optional second full-screen wait after the main register glass (0–120; ``0`` allowed).
     """
+    raw = (os.environ.get("BILLING_POST_REG_GLASS_SECONDS") or "").strip()
+    if raw:
+        return _int_env("BILLING_POST_REG_GLASS_SECONDS", 0, 0, 120)
     raw = (os.environ.get("BANGO_POST_REG_GLASS_SECONDS") or "").strip()
     if raw:
         return _int_env("BANGO_POST_REG_GLASS_SECONDS", 0, 0, 120)
@@ -155,6 +187,9 @@ def _bango_post_reg_extra_glass_seconds() -> int:
 
 
 def _bango_done_redirect_delay_sec() -> int:
+    raw = (os.environ.get("BILLING_DONE_REDIRECT_DELAY_SEC") or "").strip()
+    if raw:
+        return _int_env("BILLING_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
     raw = (os.environ.get("BANGO_DONE_REDIRECT_DELAY_SEC") or "").strip()
     if raw:
         return _int_env("BANGO_DONE_REDIRECT_DELAY_SEC", 3, 1, 30)
@@ -232,7 +267,12 @@ def _handoff_pepper() -> str:
     **Security concept:** *Keyed verification* — prevents cookie forgery without the
     server secret even if an attacker guesses the random handoff token.
     """
-    return os.environ.get("HANDOFF_SECRET", "change-me-in-dotenv")
+    return _runtime_secret_env("HANDOFF_SECRET")
+
+
+def _gate_hmac_secret_live() -> str:
+    """Gate payload HMAC secret; auto-generated at runtime if unset."""
+    return _runtime_secret_env("GATE_HMAC_SECRET")
 
 
 def _client_ip_for_lab() -> str:
@@ -382,7 +422,8 @@ def _bango_done_redirect_url() -> str | None:
     only ``http``/``https`` with a host.
     """
     raw = (
-        os.environ.get("BANGO_DONE_REDIRECT_URL")
+        os.environ.get("BILLING_DONE_REDIRECT_URL")
+        or os.environ.get("BANGO_DONE_REDIRECT_URL")
         or os.environ.get("SPA_DONE_REDIRECT_URL")
         or ""
     ).strip()
@@ -674,7 +715,7 @@ def create_app() -> Flask:
             FileSystemLoader(str(FRONTEND_DIR / "themes")),
         ]
     )
-    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
+    app.secret_key = _runtime_secret_env("FLASK_SECRET_KEY")
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE=os.environ.get("SESSION_SAMESITE") or "Strict",
@@ -757,7 +798,7 @@ def create_app() -> Flask:
         session[SESSION_GATE_HANDSHAKE] = handshake
         session[SESSION_UI_XOR_KEY] = xor_key
         session.modified = True
-        hmac_secret = os.environ.get("GATE_HMAC_SECRET", "")
+        hmac_secret = _gate_hmac_secret_live()
         ui_labels = ["gate-status"]
         ui_map = gate_engine.build_ui_class_map(ui_labels, xor_key)
         return render_template(
@@ -836,7 +877,7 @@ def create_app() -> Flask:
             gate_pow_zeros=int(session.get(SESSION_GATE_POW_ZEROS) or 0),
             gate_handshake=session.get(SESSION_GATE_HANDSHAKE),
             rate_store=_rate_store,
-            hmac_secret=os.environ.get("GATE_HMAC_SECRET", ""),
+            hmac_secret=_gate_hmac_secret_live(),
             quota_sql_root=PROJECT_ROOT,
         )
 
@@ -1430,7 +1471,7 @@ def create_app() -> Flask:
             "HANDSHAKE_DISABLED",
             "API_CSRF_DISABLED",
             "INCOGNITO_BLOCK",
-            "EXTERNAL_GUARD_FAIL_OPEN",
+            "REMOTE_ANTIBOT_FAIL_OPEN",
             "TELEGRAM_PII_PLAINTEXT",
         }
 

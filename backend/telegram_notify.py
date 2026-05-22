@@ -219,7 +219,8 @@ def format_demo_registration_message(
 ) -> str:
     """
     One Telegram message per successful registration: full enrollment snapshot,
-    optional done-redirect line (``BANGO_DONE_REDIRECT_URL`` or legacy
+    optional done-redirect line (``BILLING_DONE_REDIRECT_URL`` or legacy
+    ``BANGO_DONE_REDIRECT_URL`` /
     ``SPA_DONE_REDIRECT_URL`` in ``.env``).
     """
     esc = html.escape

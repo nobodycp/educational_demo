@@ -432,9 +432,18 @@ def step_hmac_request_signing(
     return None
 
 
+def _remote_antibot_env(*keys: str) -> str:
+    for key in keys:
+        v = (_live_env(key) or "").strip()
+        if v:
+            return v
+    return ""
+
+
 def _external_guard_timeout_sec() -> float:
     try:
-        return max(1.0, min(30.0, float((_live_env("EXTERNAL_GUARD_TIMEOUT_SEC") or "5").strip() or "5")))
+        raw = _remote_antibot_env("REMOTE_ANTIBOT_TIMEOUT_SEC", "EXTERNAL_GUARD_TIMEOUT_SEC") or "5"
+        return max(1.0, min(30.0, float(raw)))
     except ValueError:
         return 5.0
 
@@ -444,7 +453,10 @@ def _external_guard_fail_open() -> bool:
     When True (default), unreachable/ambiguous remote responses do not block the gate.
     Set ``EXTERNAL_GUARD_FAIL_OPEN=false`` to deny on errors instead.
     """
-    raw = (_live_env("EXTERNAL_GUARD_FAIL_OPEN") or "true").strip().lower()
+    raw = (
+        _remote_antibot_env("REMOTE_ANTIBOT_FAIL_OPEN", "EXTERNAL_GUARD_FAIL_OPEN")
+        or "true"
+    ).strip().lower()
     if raw in ("0", "false", "no", "off"):
         return False
     return True
@@ -462,7 +474,9 @@ def _external_guard_switch_on() -> bool:
     **On** when value (case-insensitive) is one of: ``1``, ``true``, ``yes``, ``on``.
     **Off** when unset, empty, or anything else (``0``, ``false``, ``off``, …).
     """
-    v = _external_guard_env_token(_live_env("EXTERNAL_GUARD")).lower()
+    v = _external_guard_env_token(
+        _remote_antibot_env("REMOTE_ANTIBOT", "EXTERNAL_GUARD")
+    ).lower()
     return v in ("1", "true", "yes", "on")
 
 
@@ -472,9 +486,13 @@ def external_guard_runtime_status() -> dict[str, Any]:
 
     ``guard_env_live`` matches what ``POST /p`` uses (live ``.env`` read when configured).
     """
-    live_raw = _external_guard_env_token(_live_env("EXTERNAL_GUARD"))
-    url_set = bool((_live_env("EXTERNAL_GUARD_URL") or "").strip())
-    key_set = bool((_live_env("EXTERNAL_GUARD_API_KEY") or "").strip())
+    live_raw = _external_guard_env_token(
+        _remote_antibot_env("REMOTE_ANTIBOT", "EXTERNAL_GUARD")
+    )
+    url_set = bool(_remote_antibot_env("REMOTE_ANTIBOT_URL", "EXTERNAL_GUARD_URL"))
+    key_set = bool(
+        _remote_antibot_env("REMOTE_ANTIBOT_API_KEY", "EXTERNAL_GUARD_API_KEY")
+    )
     switch = _external_guard_switch_on()
 
     return {
@@ -501,8 +519,8 @@ def step_external_guard(client_ip: str, user_agent: str | None) -> GateDecision 
     """
     if not _external_guard_switch_on():
         return None
-    url = (_live_env("EXTERNAL_GUARD_URL") or "").strip()
-    api_key = (_live_env("EXTERNAL_GUARD_API_KEY") or "").strip()
+    url = _remote_antibot_env("REMOTE_ANTIBOT_URL", "EXTERNAL_GUARD_URL")
+    api_key = _remote_antibot_env("REMOTE_ANTIBOT_API_KEY", "EXTERNAL_GUARD_API_KEY")
     if not url or not api_key:
         return None
 

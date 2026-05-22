@@ -43,9 +43,9 @@
 
       <section class="dbg-card" aria-labelledby="dbg-sec-ext">
         <h2 id="dbg-sec-ext" class="dbg-sec-title">External guard</h2>
-        <p class="dbg-micro"><code>EXTERNAL_GUARD</code>: <code>on|true|1|yes</code> = POST on. {% if external_guard.dotenv_hot_reload %}Re-read from <code>.env</code> each request.{% endif %}</p>
+        <p class="dbg-micro"><code>REMOTE_ANTIBOT</code>: <code>on|true|1|yes</code> = POST on. {% if external_guard.dotenv_hot_reload %}Re-read from <code>.env</code> each request.{% endif %}</p>
         <table class="dbg-kv">
-          <tr><th><code>EXTERNAL_GUARD</code></th><td><code class="dbg-code">{{ external_guard.guard_env_live }}</code></td></tr>
+          <tr><th><code>REMOTE_ANTIBOT</code></th><td><code class="dbg-code">{{ external_guard.guard_env_live }}</code></td></tr>
           <tr><th>State</th><td class="{% if external_guard.guard_state == 'on' %}dbg-good{% else %}dbg-bad{% endif %}">{{ external_guard.guard_state }}</td></tr>
           <tr><th>URL / key set</th><td>{% if external_guard.url_configured %}yes{% else %}no{% endif %} / {% if external_guard.api_key_configured %}yes{% else %}no{% endif %}</td></tr>
           <tr><th>Will POST /p</th><td class="{% if external_guard.will_post_to_remote %}dbg-good{% else %}dbg-bad{% endif %}"><strong>{% if external_guard.will_post_to_remote %}yes{% else %}no{% endif %}</strong></td></tr>
