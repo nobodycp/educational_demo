@@ -13,6 +13,10 @@ DEFAULT_THEMES = {
         "label": "Compact Bango",
         "template": "bango_compact.html",
     },
+    "clear": {
+        "label": "Clear Inputs",
+        "template": "bango.html",
+    },
 }
 
 

@@ -245,6 +245,29 @@
             to { transform: rotate(360deg); }
         }
     </style>
+    {% if active_theme_id == "clear" %}
+    <style>
+        /* Clear theme: stronger contrast for inputs and labels. */
+        #{{ bcls['bango-form'] }} .{{ bcls['form-group'] }} > label {
+            color: #1f2937;
+            font-weight: 800;
+            font-size: 0.9rem;
+        }
+        #{{ bcls['bango-form'] }} input {
+            border: 2px solid #1d4ed8;
+            background: #ffffff;
+            box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.08);
+        }
+        #{{ bcls['bango-form'] }} input::placeholder {
+            color: #4b5563;
+            opacity: 1;
+        }
+        #{{ bcls['bango-form'] }} input:focus {
+            border-color: #1e40af;
+            box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+        }
+    </style>
+    {% endif %}
 </head>
 <body class="{{ bcls['bango-page'] }}">
   <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ bango_ui_map_json|e }}" data-ui-key="{{ bango_xor_key|e }}" aria-hidden="true">.</div>
