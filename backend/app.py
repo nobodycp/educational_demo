@@ -13,7 +13,6 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
-FORM_VARIANTS_CONFIG = PROJECT_ROOT / "config" / "form_variants.json"
 
 from dotenv import load_dotenv
 
@@ -43,13 +42,11 @@ from flask import (
 from backend import (
     bango_hardening,
     checksum,
-    cro_variants,
     gate_engine,
     incident_store,
     ip_geo,
     ja3_lab,
     lab_shield,
-    obfuscator,
     rsa_envelope,
     telegram_notify,
     ua_parse,
@@ -73,9 +70,6 @@ SESSION_UI_XOR_KEY = "ui_xor_key"
 SESSION_CLIENT_UA = "client_ua_snapshot"
 SESSION_BANGO_CSP = "bango_csp"
 SESSION_BANGO_JS = "bango_js"
-SESSION_CRO_SUBJECT_KEY = "cro_subject_key"
-SESSION_CRO_VARIANT_ID = "cro_variant_id"
-SESSION_OBF_FIELD_MAP = "obf_field_map"
 
 _rate_store: dict[str, list[float]] = {}
 
@@ -593,15 +587,6 @@ def _spawn_telegram_after_register(
     threading.Thread(target=_work, daemon=True).start()
 
 
-def _session_subject_key() -> str:
-    key = str(session.get(SESSION_CRO_SUBJECT_KEY) or "").strip()
-    if key:
-        return key
-    key = secrets.token_hex(16)
-    session[SESSION_CRO_SUBJECT_KEY] = key
-    return key
-
-
 def create_app() -> Flask:
     """
     Application factory wiring routes to **gate_engine**, **checksum**, and SQLite.
@@ -883,43 +868,8 @@ def create_app() -> Flask:
         return _serve_core_shell_app(seg1, seg2, "bango.html")
 
     def _bango_response_html() -> object:
-        rendered_html = render_template("bango.html")
-        try:
-            cfg = cro_variants.load_variant_config(FORM_VARIANTS_CONFIG)
-            subject_key = _session_subject_key()
-            transformed_html, meta = cro_variants.render_test_variant_safe(
-                rendered_html, cfg, subject_key
-            )
-            if bool(meta.get("applied")):
-                variant_id = str(meta.get("variant_id") or "")
-                if variant_id:
-                    session[SESSION_CRO_VARIANT_ID] = variant_id
-                    cro_variants.append_variant_event(
-                        PROJECT_ROOT,
-                        event_type="exposure",
-                        payload={
-                            "variant_id": variant_id,
-                            "path": request.path,
-                            "client_ip": _client_ip_for_lab(),
-                        },
-                    )
-                rendered_html = transformed_html
-        except Exception as exc:
-            app.logger.info("CRO variant render skipped: %s", exc)
-        # --- Apply full obfuscation layer on top of CRO output ---
-        try:
-            obf_html, obf_meta = obfuscator.apply_obfuscation(
-                rendered_html,
-                encode_labels=True,
-                encode_placeholders=True,
-            )
-            if obf_meta.get("applied"):
-                session[SESSION_OBF_FIELD_MAP] = obf_meta.get("field_map", {})
-                rendered_html = obf_html
-        except Exception as exc:
-            app.logger.info("Obfuscation layer skipped: %s", exc)
         resp = make_response(
-            rendered_html,
+            render_template("bango.html"),
             200,
             {"Content-Type": "text/html; charset=utf-8"},
         )
@@ -1138,11 +1088,6 @@ def create_app() -> Flask:
         except Exception:
             return make_randomized_json_response({"ok": False, "error": "json"}, 400)
 
-        # Decode obfuscated field names if client-side JS mapping failed
-        field_map = session.get(SESSION_OBF_FIELD_MAP) or {}
-        if field_map and isinstance(field_map, dict):
-            data = obfuscator.decode_post_data(data, field_map)
-
         if bango_hardening.honeypot_filled(data):
             return make_randomized_json_response(
                 {"ok": False, "error": "honeypot_filled"}, 400, status_pool="bot"
@@ -1302,18 +1247,6 @@ def create_app() -> Flask:
             request.headers.get("User-Agent"),
             done_redirect_url=_done,
         )
-        try:
-            cro_variants.append_variant_event(
-                PROJECT_ROOT,
-                event_type="conversion",
-                payload={
-                    "variant_id": str(session.get(SESSION_CRO_VARIANT_ID) or ""),
-                    "path": request.path,
-                    "client_ip": _lab_ip,
-                },
-            )
-        except Exception as exc:
-            app.logger.info("CRO variant conversion log skipped: %s", exc)
         return make_randomized_json_response(
             {
                 "ok": True,
@@ -1386,7 +1319,3 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), debug=True)
-
-
-
-
