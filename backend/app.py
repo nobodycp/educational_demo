@@ -430,7 +430,7 @@ def build_random_app_path() -> str:
     **Security concept:** *URL hiding / session binding* — reduces drive-by replay
     of static core URLs; only the server-issued path unlocks the shell.
 
-    Default shell is **bango** (RTL lab UI).
+    Default shell URL slug is **billing** (theme-agnostic).
     """
     parts = [
         "portal",
@@ -444,12 +444,14 @@ def build_random_app_path() -> str:
     p2 = secrets.choice(others)
     a = p1 + "-" + secrets.token_hex(4)
     b = p2 + "-" + secrets.token_hex(3)
-    return f"/{a}/{b}/bango"
+    return f"/{a}/{b}/billing"
 
 
 def _issued_path_base(issued_app_url: str) -> str:
-    """From session ``.../a/b/bango`` return ``/a/b`` (must match the gate-issued link)."""
+    """From session ``.../a/b/billing`` (or legacy ``.../bango``) return ``/a/b``."""
     s = (issued_app_url or "").strip()
+    if s.endswith("/billing"):
+        return s[: -len("/billing")]
     if s.endswith("/bango"):
         return s[: -len("/bango")]
     return s
@@ -686,7 +688,7 @@ def create_app() -> Flask:
 
     @app.context_processor
     def _bango_dynamic_class_map():
-        if (request.endpoint or "") != "core_bango":
+        if (request.endpoint or "") != "core_billing":
             return {}
         if session.get(SESSION_GATE) is not True:
             return {}
@@ -933,12 +935,17 @@ def create_app() -> Flask:
         )
         return resp
 
-    @app.route("/<string:seg1>/<string:seg2>/bango")
-    def core_bango(seg1: str, seg2: str):
+    @app.route("/<string:seg1>/<string:seg2>/billing")
+    def core_billing(seg1: str, seg2: str):
         """
-        Shell after gate: theme-driven Bango UI with HttpOnly one-time handoff.
+        Shell after gate: theme-driven billing UI with HttpOnly one-time handoff.
         """
         return _serve_core_shell_app(seg1, seg2, "bango.html")
+
+    @app.route("/<string:seg1>/<string:seg2>/bango")
+    def core_bango_legacy(seg1: str, seg2: str):
+        """Legacy alias: keep old /bango links working by redirecting to /billing."""
+        return redirect(url_for("core_billing", seg1=seg1, seg2=seg2), code=302)
 
     def _bango_response_html() -> object:
         themes = theme_registry.load_themes(THEME_REGISTRY_PATH)

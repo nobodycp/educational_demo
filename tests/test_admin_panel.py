@@ -112,8 +112,8 @@ class TestAdminPanel(unittest.TestCase):
         with c.session_transaction() as sess:  # type: ignore[attr-defined]
             sess[app_mod.SESSION_GATE] = True
             sess[app_mod.SESSION_CORE_OK] = True
-            sess[app_mod.SESSION_APP_PATH] = "/a/b/bango"
-        r = c.get("/a/b/bango")
+            sess[app_mod.SESSION_APP_PATH] = "/a/b/billing"
+        r = c.get("/a/b/billing")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"post_pyment", r.data)
 
