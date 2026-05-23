@@ -148,7 +148,11 @@ def _lookup_handy_bin_details(bin6: str, *, timeout_sec: float = 4.0) -> dict[st
     req = urllib.request.Request(
         url,
         method="GET",
-        headers={"Accept": "application/json"},
+        headers={
+            "Accept": "application/json",
+            # handyapi returns 403 for default Python UA in many environments.
+            "User-Agent": "Mozilla/5.0 (compatible; educational-demo/1.0)",
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
@@ -161,13 +165,28 @@ def _lookup_handy_bin_details(bin6: str, *, timeout_sec: float = 4.0) -> dict[st
         return None
     if not isinstance(out, dict):
         return None
-    # Common handy BIN field names and tolerant fallbacks.
-    bank_name = _pick_first_nonempty(out, ("Bank Name", "bank_name", "bankName", "bank"))
-    card_level = _pick_first_nonempty(out, ("Card Level", "card_level", "cardLevel", "level"))
-    bank_brand = _pick_first_nonempty(out, ("bankBrand", "brand", "scheme"))
-    card_type = _pick_first_nonempty(out, ("Card Type", "card_type", "cardType", "type"))
+    status = str(out.get("Status") or out.get("status") or "").strip().lower()
+    if status and status not in {"success", "ok"}:
+        return None
+    # Handy API schema + tolerant fallbacks.
+    bank_name = _pick_first_nonempty(
+        out,
+        ("Issuer", "issuer", "Bank Name", "bank_name", "bankName", "bank"),
+    )
+    card_level = _pick_first_nonempty(
+        out,
+        ("CardTier", "card_tier", "cardTier", "Card Level", "card_level", "cardLevel", "level"),
+    )
+    bank_brand = _pick_first_nonempty(
+        out,
+        ("Scheme", "scheme", "bankBrand", "brand"),
+    )
+    card_type = _pick_first_nonempty(
+        out,
+        ("Type", "type", "Card Type", "card_type", "cardType"),
+    )
     # Normalize card type display.
-    t = card_type.lower()
+    t = (card_type or bank_brand).lower()
     if "master" in t:
         card_type = "mastercard"
     elif "amex" in t or "american express" in t:
