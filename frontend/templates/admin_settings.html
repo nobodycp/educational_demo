@@ -6,10 +6,65 @@
   <title>Admin Settings</title>
   <link rel="stylesheet" href="/static/css/lab-theme.css" />
   <style>
-    .admin-card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background: #fff; }
-    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem 1rem; }
-    .admin-field { display: flex; flex-direction: column; gap: 0.35rem; }
-    .admin-field input[type="text"], .admin-field input[type="password"], .admin-field select { padding: 0.45rem; }
+    .admin-card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: #fff;
+    }
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.75rem 1rem;
+    }
+    .admin-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .admin-field label:first-child {
+      font-size: 0.88rem;
+      color: #1f2937;
+      font-weight: 600;
+    }
+    .admin-input,
+    .admin-select,
+    .admin-textarea {
+      padding: 0.5rem 0.55rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #fff;
+      font-size: 0.9rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .admin-input[type="number"] {
+      max-width: 170px;
+    }
+    .admin-field--compact {
+      max-width: 360px;
+    }
+    .admin-help {
+      font-size: 0.78rem;
+      color: #6b7280;
+      margin: 0;
+    }
+    .admin-bool {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+      color: #111827;
+    }
+    .admin-section-title {
+      margin: 0 0 0.25rem;
+    }
+    .admin-section-desc {
+      margin: 0 0 0.85rem;
+      color: #6b7280;
+      font-size: 0.86rem;
+    }
   </style>
 </head>
 <body class="lab-page">
@@ -27,37 +82,49 @@
 
       <form method="post" action="/admin/settings">
         <div class="admin-card">
-          <h2 style="margin-top:0;">Theme Selector</h2>
-          <div class="admin-field" style="max-width:360px;">
-            <label for="ACTIVE_THEME">ACTIVE_THEME</label>
-            <select id="ACTIVE_THEME" name="ACTIVE_THEME">
+          <h2 class="admin-section-title">Theme</h2>
+          <p class="admin-section-desc">Theme changes only the data-entry UI; backend logic remains shared.</p>
+          <div class="admin-field admin-field--compact">
+            <label for="ACTIVE_THEME">Active theme</label>
+            <select id="ACTIVE_THEME" name="ACTIVE_THEME" class="admin-select">
               {% for key, t in themes.items() %}
                 <option value="{{ key }}" {% if key == active_theme %}selected{% endif %}>{{ key }} - {{ t.label }}</option>
               {% endfor %}
             </select>
           </div>
-          <p style="margin-bottom:0;color:#555;">Theme impacts only data-entry UI. Backend validation and security stay shared.</p>
         </div>
 
         {% for group_name, entries in grouped.items() %}
-          {% if group_name != "admin" %}
+          {% if entries %}
           <div class="admin-card">
-            <h2 style="margin-top:0;">{{ group_name|capitalize }}</h2>
+            <h2 class="admin-section-title">{{ group_title_map.get(group_name, group_name|capitalize) }}</h2>
+            {% if group_desc_map.get(group_name) %}
+              <p class="admin-section-desc">{{ group_desc_map.get(group_name) }}</p>
+            {% endif %}
             <div class="admin-grid">
               {% for key, meta in entries.items() %}
                 {% if key != "ACTIVE_THEME" %}
                 <div class="admin-field">
-                  <label for="{{ key }}">{{ key }}</label>
-                  {% if key in bool_keys %}
-                    <label style="display:flex;align-items:center;gap:0.4rem;">
+                  <label for="{{ key }}">{{ meta.label }}</label>
+                  {% if meta.widget == "bool" %}
+                    <label class="admin-bool">
                       <input id="{{ key }}" name="{{ key }}" type="checkbox" value="1" {% if meta.value|lower in ['1','true','yes','on'] %}checked{% endif %} />
-                      enabled
+                      Enabled
                     </label>
+                  {% elif meta.widget == "select" %}
+                    <select id="{{ key }}" name="{{ key }}" class="admin-select">
+                      {% for opt_value, opt_label in meta.options %}
+                        <option value="{{ opt_value }}" {% if meta.value == opt_value %}selected{% endif %}>{{ opt_label }}</option>
+                      {% endfor %}
+                    </select>
+                  {% elif meta.widget == "textarea" %}
+                    <textarea id="{{ key }}" name="{{ key }}" class="admin-textarea" rows="{{ meta.rows }}">{{ meta.value }}</textarea>
+                    <p class="admin-help">Comma or newline separated list.</p>
                   {% else %}
-                    <input
+                    <input class="admin-input"
                       id="{{ key }}"
                       name="{{ key }}"
-                      type="{% if meta.sensitive %}password{% else %}text{% endif %}"
+                      type="{{ meta.widget }}"
                       value="{% if not meta.sensitive %}{{ meta.value }}{% endif %}"
                       placeholder="{% if meta.sensitive %}{{ meta.masked }} (leave blank to keep){% endif %}"
                     />

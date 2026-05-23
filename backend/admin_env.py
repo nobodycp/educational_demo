@@ -16,6 +16,7 @@ ENV_ALLOWLIST_GROUPS: dict[str, list[str]] = {
     ],
     "gate": [
         "POW_LEADING_ZEROS_HEX",
+        "GUARD_DEVTOOLS",
         "GATE_CSRF_DISABLED",
         "HANDSHAKE_DISABLED",
         "API_CSRF_DISABLED",

