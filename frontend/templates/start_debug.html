@@ -24,6 +24,7 @@
           <tr><th>Client IP</th><td><code class="dbg-code">{{ client_ip }}</code></td></tr>
           <tr><th>Blocked redirect</th><td>{% if gate_blocked_redirect %}<code class="dbg-code dbg-code--break" title="{{ gate_blocked_redirect }}">{{ gate_blocked_redirect }}</code>{% else %}<span class="dbg-muted">(unset · <code>GATE_BLOCKED_REDIRECT_URL</code>)</span>{% endif %}</td></tr>
           <tr><th>Lifetime quota</th><td><span class="{% if gate_quota.exhausted %}dbg-bad{% else %}dbg-good{% endif %}">{{ gate_quota.current }}</span> / {{ gate_quota.max }} <span class="dbg-muted">(passes + external-guard denies)</span> {% if gate_quota.exhausted %}<span class="dbg-bad">· cap hit</span>{% endif %}</td></tr>
+          <tr><th>Gate HMAC</th><td class="{% if gate_hmac_enabled %}dbg-bad{% else %}dbg-good{% endif %}">{% if gate_hmac_enabled %}on (<code>GATE_HMAC_SECRET</code> set){% else %}off (recommended for Coolify / multi-worker){% endif %}</td></tr>
           <tr><th>SQLite totals</th><td>ok <strong>{{ lifetime.allowed }}</strong> · deny <strong>{{ lifetime.denied }}</strong> · rows <strong>{{ lifetime.total }}</strong></td></tr>
         </table>
       </section>
@@ -98,7 +99,7 @@
               {% for r in rows %}
               <tr>
                 <td class="dbg-num">{{ r.id }}</td>
-                <td><code class="dbg-code">{{ "%.3f"|format(r.created_at) }}</code></td>
+                <td><code class="dbg-code" title="unix {{ r.created_at }}">{{ r.created_at_fmt or r.created_at }}</code></td>
                 <td class="{% if r.allowed %}dbg-good{% else %}dbg-bad{% endif %}">{% if r.allowed %}ok{% else %}no{% endif %}</td>
                 <td>
                   {% if r.reason == "external_guard_denied" and r.risk is mapping %}
@@ -106,6 +107,26 @@
                     <code class="dbg-code dbg-reason" title="external_guard_denied">{{ ext or "denied" }}</code>
                   {% else %}
                     <code class="dbg-code dbg-reason">{{ r.reason or "—" }}</code>
+                  {% endif %}
+                  {% if r.risk is mapping %}
+                    {% if r.risk.get("subreason") %}
+                      <div class="dbg-detail"><span class="dbg-detail-label">sub</span> {{ r.risk.subreason }}</div>
+                    {% endif %}
+                    {% if r.risk.get("hint") %}
+                      <div class="dbg-detail dbg-detail--hint">{{ r.risk.hint }}</div>
+                    {% endif %}
+                    {% if r.risk.get("ts_skew_sec") is not none %}
+                      <div class="dbg-micro">ts skew {{ r.risk.ts_skew_sec }}s{% if r.risk.get("server_ts") %} · server {{ r.risk.server_ts }}{% endif %}{% if r.risk.get("client_ts") %} · client {{ r.risk.client_ts }}{% endif %}</div>
+                    {% endif %}
+                    {% if r.risk.get("client_sent_sig") is not none or r.risk.get("client_sent_ts") is not none %}
+                      <div class="dbg-micro">client sig={{ r.risk.get("client_sent_sig") }} ts={{ r.risk.get("client_sent_ts") }}</div>
+                    {% endif %}
+                    {% if r.risk.get("server_hmac_configured") %}
+                      <div class="dbg-micro">server HMAC on · secret len {{ r.risk.get("server_secret_len", "?") }} · sig len {{ r.risk.get("client_sig_len", "?") }}</div>
+                    {% endif %}
+                    {% if r.risk.get("canonical_sha256_prefix") %}
+                      <div class="dbg-micro">canonical sha256 {{ r.risk.canonical_sha256_prefix }}… (len {{ r.risk.get("canonical_len", "?") }})</div>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td class="dbg-muted">{{ r.phase or "—" }}</td>
@@ -117,7 +138,7 @@
             </tbody>
           </table>
         </div>
-        <p class="dbg-foot">After Origin check. Examples: <code>rate_limit</code>, <code>lifetime_ip_cap</code>, <code>external_guard_denied</code>, <code>bad_csrf</code>, <code>bad_pow</code>, <code>shell_guard_devtools</code> (client report before redirect; see <code>risk.subreason</code>).</p>
+        <p class="dbg-foot">After Origin check. Examples: <code>rate_limit</code>, <code>lifetime_ip_cap</code>, <code>external_guard_denied</code>, <code>bad_csrf</code>, <code>bad_pow</code>. HMAC rows show <strong>sub</strong> + hint inline: <code>bad_sig</code> / <code>digest_mismatch</code> (secret/worker/cache), <code>hmac_disabled_client_signed</code> (stale /start), <code>missing_sig</code>, <code>stale_ts</code>. <code>shell_guard_devtools</code> → see <code>risk.subreason</code>.</p>
       </section>
     </div>
   </div>

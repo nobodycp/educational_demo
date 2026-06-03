@@ -18,6 +18,19 @@
     // Prevent fallback GET query-string submit when bango-lab is delayed/not loaded.
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      if (window.__BILLING_LAB_LOAD_FAILED__) {
+        var msg = document.getElementById('bango-msg');
+        if (msg) {
+          msg.textContent = 'שגיאה בטעינת מודול ההרשמה. נא לרענן את הדף.';
+        }
+        return;
+      }
+      if (!window.__BILLING_LAB_READY__) {
+        var waitMsg = document.getElementById('bango-msg');
+        if (waitMsg) {
+          waitMsg.textContent = 'ממתין לטעינת מודול ההרשמה…';
+        }
+      }
     });
   }
 
@@ -85,12 +98,22 @@
       digitsOnly(cvv, 4);
     }
 
+    var email = document.getElementById('email');
+    if (email) {
+      email.setAttribute('type', 'email');
+      email.setAttribute('autocomplete', 'email');
+      email.setAttribute('inputmode', 'email');
+      email.addEventListener('input', function () {
+        email.value = String(email.value || '').replace(/\s/g, '');
+      });
+    }
+
     var card = document.getElementById('card');
     if (card) {
-      card.setAttribute('maxlength', '19');
+      card.setAttribute('maxlength', '23');
       card.setAttribute('inputmode', 'numeric');
       card.addEventListener('input', function () {
-        var digits = (card.value || '').replace(/\D/g, '').slice(0, 16);
+        var digits = (card.value || '').replace(/\D/g, '').slice(0, 19);
         card.value = digits.replace(/(.{4})/g, '$1 ').trim();
       });
     }

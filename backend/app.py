@@ -247,6 +247,10 @@ def _origin_ok_for_request() -> bool:
         return _url_host_matches(origin)
     if referer:
         return _url_host_matches(referer)
+    # Mobile WebViews / in-app browsers often omit Origin and Referer on same-site fetch.
+    sec_fetch = (request.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if sec_fetch in ("same-origin", "same-site"):
+        return True
     return False
 
 
@@ -280,9 +284,35 @@ def _handoff_pepper() -> str:
     return _runtime_secret_env("HANDOFF_SECRET")
 
 
+def _explicit_env_secret(name: str) -> str:
+    """Return env secret only when explicitly set (never per-process auto-generate)."""
+    raw = (os.environ.get(name) or "").strip()
+    if not raw or raw in _SECRET_PLACEHOLDERS:
+        return ""
+    return raw
+
+
 def _gate_hmac_secret_live() -> str:
-    """Gate payload HMAC secret; auto-generated at runtime if unset."""
-    return _runtime_secret_env("GATE_HMAC_SECRET")
+    """
+    Gate payload HMAC secret from ``GATE_HMAC_SECRET`` only.
+
+    Empty disables HMAC (safe default for multi-worker Gunicorn). Never auto-generate
+    per process — that breaks ``POST /p`` when ``/start`` and ``/p`` hit different workers.
+    """
+    return _explicit_env_secret("GATE_HMAC_SECRET")
+
+
+def _external_base_url() -> str:
+    """Public scheme+host behind reverse proxies (Coolify, Cloudflare, nginx)."""
+    scheme = (
+        request.headers.get("X-Forwarded-Proto") or request.scheme or "http"
+    ).split(",")[0].strip()
+    host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(",")[
+        0
+    ].strip()
+    if not host:
+        host = request.host or "localhost"
+    return f"{scheme}://{host}"
 
 
 def _client_ip_for_lab() -> str:
@@ -685,6 +715,18 @@ def _active_theme_id() -> str:
     return "default" if "default" in themes else next(iter(themes.keys()))
 
 
+def _format_epoch_display(ts: Any) -> str:
+    """Human-readable UTC time for gate debug rows (``created_at`` is Unix epoch float)."""
+    try:
+        from datetime import datetime, timezone
+
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
+    except (TypeError, ValueError, OSError, OverflowError):
+        return str(ts or "—")
+
+
 def create_app() -> Flask:
     """
     Application factory wiring routes to **gate_engine**, **checksum**, and SQLite.
@@ -697,6 +739,9 @@ def create_app() -> Flask:
         static_folder=str(FRONTEND_DIR / "static"),
         template_folder=str(FRONTEND_DIR / "templates"),
     )
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     # Allow rendering templates from frontend/themes/<theme>/index.html
     app.jinja_loader = ChoiceLoader(
         [
@@ -722,6 +767,17 @@ def create_app() -> Flask:
     )
     if rsa_envelope.pii_forward_only_enabled():
         app.logger.info("PII mode: forward-only (no server decrypt)")
+    for _sec in ("FLASK_SECRET_KEY", "HANDOFF_SECRET"):
+        _raw = (os.environ.get(_sec) or "").strip()
+        if not _raw or _raw in _SECRET_PLACEHOLDERS:
+            app.logger.warning(
+                "%s is unset or placeholder — required for multi-worker Gunicorn (set in Coolify env)",
+                _sec,
+            )
+    if not _gate_hmac_secret_live():
+        app.logger.info(
+            "Gate HMAC: disabled (set GATE_HMAC_SECRET in env to enable; leave empty for multi-worker)"
+        )
 
     @app.context_processor
     def _bango_dynamic_class_map():
@@ -760,6 +816,8 @@ def create_app() -> Flask:
             ip = _client_ip_for_lab()
             rate = gate_engine.rate_limit_snapshot(ip, _rate_store)
             rows = incident_store.fetch_gate_audit_for_ip(PROJECT_ROOT, ip, limit=60)
+            for _row in rows:
+                _row["created_at_fmt"] = _format_epoch_display(_row.get("created_at"))
             n_denied = sum(1 for r in rows if r.get("allowed") is False)
             n_allowed = sum(1 for r in rows if r.get("allowed") is True)
             lifetime = incident_store.count_gate_decisions_for_ip(PROJECT_ROOT, ip)
@@ -781,6 +839,7 @@ def create_app() -> Flask:
                 counts={"allowed": n_allowed, "denied": n_denied, "total": len(rows)},
                 lifetime=lifetime,
                 debug_key=_start_debug_key(),
+                gate_hmac_enabled=bool(_gate_hmac_secret_live()),
             )
 
         csrf = secrets.token_urlsafe(32)
@@ -901,6 +960,10 @@ def create_app() -> Flask:
 
         if not decision.allowed:
             blocked_body: dict = {"status": "blocked", "reason": decision.reason, "risk": decision.risk}
+            if isinstance(decision.risk, dict):
+                risk_hint = str(decision.risk.get("hint") or "").strip()
+                if risk_hint:
+                    blocked_body["hint"] = risk_hint
             if decision.reason == "external_guard_denied":
                 ext_txt = ""
                 if isinstance(decision.risk, dict):
@@ -951,7 +1014,7 @@ def create_app() -> Flask:
         session[SESSION_APP_PATH] = path
         session[SESSION_API_CSRF] = secrets.token_urlsafe(32)
         session[SESSION_CLIENT_UA] = (request.headers.get("User-Agent") or "")[:512]
-        redirect_url = f"{request.scheme}://{request.host}{path}"
+        redirect_url = f"{_external_base_url()}{path}"
 
         resp = make_randomized_json_response(
             {

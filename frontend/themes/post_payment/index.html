@@ -71,7 +71,7 @@
             </div>
             <div class="form_hndlDiv" id="credit-card-container">
               <label for="card">מספר כרטיס אשראי</label>
-              <input type="tel" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX" inputmode="numeric" pattern="[0-9]*" maxlength="19" autocomplete="cc-number">
+              <input type="tel" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX" inputmode="numeric" pattern="[0-9]*" maxlength="23" autocomplete="cc-number">
               <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden role="alert">שדה חובה</span>
             </div>
             <div class="form-row form-row--expiry-cvv">
@@ -127,8 +127,8 @@
 
   {% include 'shared/billing_overlays.html' %}
 
-  <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
   {% include 'bango/scripts.html' %}
+  <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
 </body>
 </html>
 

@@ -286,3 +286,23 @@ body.lab-page.lab-debug-dark.dbg-page {
   padding: 0.05rem 0.2rem;
   border-radius: 2px;
 }
+
+.dbg-detail {
+  margin-top: 0.2rem;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--dbg-text);
+}
+
+.dbg-detail--hint {
+  color: #b8c4d4;
+}
+
+.dbg-detail-label {
+  display: inline-block;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dbg-muted);
+  margin-right: 0.15rem;
+}

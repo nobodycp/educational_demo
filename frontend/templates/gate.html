@@ -44,6 +44,9 @@
       font-size: 0.95rem;
       font-weight: 600;
       color: var(--lab-muted);
+      white-space: pre-wrap;
+      max-width: min(28rem, 92vw);
+      line-height: 1.45;
     }
   </style>
 </head>
@@ -117,6 +120,28 @@
 
       function fatal(msg) {
         statusEl.textContent = msg;
+      }
+
+      function formatBlockedMessage(data) {
+        var lines = [];
+        var reason = data && data.reason ? String(data.reason) : "";
+        if (reason) {
+          lines.push("Unable to continue (" + reason + ").");
+        } else {
+          lines.push("Unable to continue.");
+        }
+        var risk = data && data.risk && typeof data.risk === "object" ? data.risk : null;
+        if (risk && risk.subreason) {
+          lines.push("Cause: " + String(risk.subreason));
+        }
+        var hint =
+          (data && data.hint && String(data.hint)) ||
+          (risk && risk.hint && String(risk.hint)) ||
+          "";
+        if (hint) {
+          lines.push(hint);
+        }
+        return lines.join("\n");
       }
 
       function sha256Hex(str) {
@@ -282,7 +307,15 @@
                       window.location.href = normalizeRedirectUrl(data.redirect_url);
                       return;
                     }
+                    if (data.status === "blocked" && data.reason) {
+                      fatal(formatBlockedMessage(data));
+                      return;
+                    }
                     if (!res.ok && tryRedirect(data.redirect_url)) return;
+                    if (!res.ok && data.reason) {
+                      fatal(formatBlockedMessage(data));
+                      return;
+                    }
                     if (!res.ok && data.hint) {
                       fatal(
                         (data.hint && String(data.hint)) ||
@@ -297,7 +330,8 @@
                     fatal("Unable to continue.");
                   })
                   .catch(function (e) {
-                    fatal("Unable to continue.");
+                    var msg = e && e.message ? String(e.message) : "network";
+                    fatal("Unable to continue (" + msg + ").");
                   });
               }
 

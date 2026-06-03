@@ -126,6 +126,14 @@ def battery_full_charging_desktop_suspect(
     mobile = bool(bat.get("mobile_guess") is True)
     if mobile:
         return False
+    # Laptops (MacBook, etc.) report battery like desktops in UA; skip obvious laptop signals.
+    if isinstance(fingerprint, dict):
+        ua = str(fingerprint.get("userAgent") or "").lower()
+        if "macintosh" in ua or "mac os" in ua:
+            return False
+        mtp = fingerprint.get("maxTouchPoints")
+        if isinstance(mtp, (int, float)) and mtp > 0:
+            return False
     return True
 
 

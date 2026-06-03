@@ -100,7 +100,7 @@
               return storageHintFromEstimate(est);
             })
             .catch(function () {
-              return true;
+              return false;
             })
         );
       }

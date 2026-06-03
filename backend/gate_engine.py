@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -413,22 +414,121 @@ def step_hmac_request_signing(
     freshness window when the secret is **not** public (labs may intentionally
     violate this by embedding secrets client-side to teach why it fails).
     """
+    got_sig = sig is not None and str(sig).strip() != ""
+    got_ts = ts is not None and str(ts).strip() != ""
+
     if not secret:
+        if got_sig or got_ts:
+            return GateDecision(
+                False,
+                400,
+                "hmac_disabled_client_signed",
+                {
+                    "score": 90,
+                    "decision": "deny",
+                    "subreason": "server_hmac_off_client_sent_sig",
+                    "hint": (
+                        "Server has no GATE_HMAC_SECRET but the browser still signed the "
+                        "payload (stale /start HTML or old deploy). Hard-refresh /start or redeploy."
+                    ),
+                    "client_sent_sig": got_sig,
+                    "client_sent_ts": got_ts,
+                },
+            )
         return None
-    if ts is None or sig is None:
-        return GateDecision(False, 400, "missing_sig", {"score": 80, "decision": "deny"})
+
+    if not got_ts or not got_sig:
+        return GateDecision(
+            False,
+            400,
+            "missing_sig",
+            {
+                "score": 80,
+                "decision": "deny",
+                "subreason": "missing_ts_or_sig",
+                "hint": (
+                    "GATE_HMAC_SECRET is set on the server but POST /p did not include ts/sig. "
+                    "Reload /start so the gate page picks up the current HMAC setting."
+                ),
+                "client_sent_sig": got_sig,
+                "client_sent_ts": got_ts,
+                "server_hmac_configured": True,
+            },
+        )
     try:
         ts_int = int(ts)
     except (TypeError, ValueError):
-        return GateDecision(False, 400, "bad_ts", {"score": 70, "decision": "deny"})
-    if abs(int(time.time()) - ts_int) > skew_sec:
-        return GateDecision(False, 400, "stale_ts", {"score": 65, "decision": "deny"})
+        return GateDecision(
+            False,
+            400,
+            "bad_ts",
+            {
+                "score": 70,
+                "decision": "deny",
+                "subreason": "invalid_ts",
+                "hint": f"ts is not an integer: {ts!r}",
+                "client_sent_ts": True,
+            },
+        )
+    now = int(time.time())
+    skew = abs(now - ts_int)
+    if skew > skew_sec:
+        return GateDecision(
+            False,
+            400,
+            "stale_ts",
+            {
+                "score": 65,
+                "decision": "deny",
+                "subreason": "stale_ts",
+                "hint": (
+                    f"Request timestamp skew {skew}s exceeds {skew_sec}s "
+                    "(device clock wrong or replay)."
+                ),
+                "ts_skew_sec": skew,
+                "server_ts": now,
+                "client_ts": ts_int,
+            },
+        )
     body_for_sig = {k: v for k, v in body.items() if k not in ("ts", "sig")}
-    canonical = json.dumps(body_for_sig, sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(
+        body_for_sig, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     msg = f"{ts_int}|{canonical}".encode("utf-8", errors="strict")
     expected = hmac.new(secret.encode("utf-8", errors="strict"), msg, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, str(sig)):
-        return GateDecision(False, 400, "bad_sig", {"score": 95, "decision": "deny"})
+    sig_str = str(sig).strip()
+    if not hmac.compare_digest(expected, sig_str):
+        subreason = "digest_mismatch"
+        hint = (
+            "HMAC signature does not match. Common causes: GATE_HMAC_SECRET differs between "
+            "Gunicorn workers, /start was loaded on one worker and POST /p hit another, stale "
+            "/start cache in the browser, or JSON canonical drift. Fix: leave GATE_HMAC_SECRET "
+            "empty on Coolify (recommended) or set one shared value + redeploy + hard-refresh /start."
+        )
+        if len(sig_str) != 64 or not re.fullmatch(r"[0-9a-fA-F]{64}", sig_str):
+            subreason = "malformed_sig"
+            hint = (
+                f"Client sig length/shape is wrong (got {len(sig_str)} chars, expected 64 hex). "
+                "Reload /start and retry."
+            )
+        return GateDecision(
+            False,
+            400,
+            "bad_sig",
+            {
+                "score": 95,
+                "decision": "deny",
+                "subreason": subreason,
+                "hint": hint,
+                "server_hmac_configured": True,
+                "server_secret_len": len(secret),
+                "client_sig_len": len(sig_str),
+                "ts_skew_sec": skew,
+                "canonical_len": len(canonical),
+                "body_key_count": len(body_for_sig),
+                "canonical_sha256_prefix": hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16],
+            },
+        )
     return None
 
 

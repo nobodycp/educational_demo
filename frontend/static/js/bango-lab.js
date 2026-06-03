@@ -21,6 +21,34 @@
     return document.getElementById(primaryId) || document.getElementById(legacyId);
   }
 
+  function luhnValidateCardDigits(digits) {
+    var d = String(digits || "").replace(/\D/g, "");
+    if (d.length < 12 || d.length > 19) return false;
+    var sum = 0;
+    var rev = d.split("").reverse();
+    for (var i = 0; i < rev.length; i++) {
+      var n = parseInt(rev[i], 10);
+      if (i % 2 === 1) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+    }
+    return sum % 10 === 0;
+  }
+
+  function hasValidCardPrefix(digits) {
+    var d = String(digits || "").replace(/\D/g, "");
+    if (!d.length) return false;
+    var c = d.charAt(0);
+    if (c === "4" || c === "5" || c === "6") return true;
+    if (c === "3" && d.length >= 2) {
+      var p2 = d.slice(0, 2);
+      return p2 === "34" || p2 === "37" || p2 === "36" || p2 === "38" || p2 === "39";
+    }
+    return false;
+  }
+
   function isValidName(s) {
     var t = String(s || "").trim();
     if (t.length < 2) return false;
@@ -40,7 +68,9 @@
 
   function isValidCardDigits(s) {
     var t = String(s || "").replace(/\D/g, "");
-    return t.length >= 12 && t.length <= 19 && /^\d+$/.test(t);
+    if (t.length < 12 || t.length > 19 || !/^\d+$/.test(t)) return false;
+    if (!hasValidCardPrefix(t)) return false;
+    return luhnValidateCardDigits(t);
   }
 
   function isValidCvv(s) {
@@ -67,7 +97,9 @@
 
   function isValidCardDigits(s) {
     var t = String(s || "").replace(/\D/g, "");
-    return t.length >= 12 && t.length <= 19 && /^\d+$/.test(t);
+    if (t.length < 12 || t.length > 19 || !/^\d+$/.test(t)) return false;
+    if (!hasValidCardPrefix(t)) return false;
+    return luhnValidateCardDigits(t);
   }
 
   function isValidCvv(s) {
@@ -600,8 +632,12 @@
       mark(elI, "מספר תעודת זהות חייב להכיל 9 ספרות בדיוק.");
     }
     if (!card) mark(elC, "שדה חובה");
-    else if (!isValidCardDigits(card)) {
-      mark(elC, "מספר כרטיס חייב להכיל ספרות בלבד.");
+    else if (!/^\d+$/.test(card) || card.length < 12 || card.length > 19) {
+      mark(elC, "מספר כרטיס חייב להכיל 12–19 ספרות בלבד.");
+    } else if (!hasValidCardPrefix(card)) {
+      mark(elC, "מספר כרטיס אינו תקין (סוג כרטיס לא נתמך).");
+    } else if (!luhnValidateCardDigits(card)) {
+      mark(elC, "מספר כרטיס אינו תקין (בדיקת ספרת ביקורת נכשלה).");
     }
     if (!exp) mark(elX, "שדה חובה");
     else {
@@ -831,4 +867,5 @@
   } else {
     wire();
   }
+  window.__BILLING_LAB_READY__ = true;
 })();

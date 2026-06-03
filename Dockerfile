@@ -36,7 +36,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 
 CMD ["gunicorn", "wsgi:app", \
      "--bind", "0.0.0.0:5000", \
-     "--workers", "4", \
+     "--workers", "2", \
+     "--preload", \
      "--threads", "2", \
      "--timeout", "120", \
      "--access-logfile", "-", \
