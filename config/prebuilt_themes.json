@@ -1,0 +1,12 @@
+{
+  "themes": {
+    "default": {
+      "label": "Default Bango",
+      "template": "bango/index.html"
+    },
+    "post_payment": {
+      "label": "Post Payment",
+      "template": "post_payment/index.html"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "title": "אתר דואר",
+  "order_summary": "החבילה שלך מחכה למשלוח. אנא שלם מכס (7.99 ₪)",
+  "server_error": "הודעת שגיאה מהשרת",
+  "order_details": "מספר חבילה",
+  "customer_details": "פרטי לקוח",
+  "payment_details": "פרטי תשלום",
+  "labels": {
+    "order_id": "עקוב אחר חבילה",
+    "fname": "שם פרטי",
+    "lname": "שם משפחה",
+    "phone": "מספר טלפון נייד",
+    "email": "דוא\"ל",
+    "cc": "מספר כרטיס אשראי",
+    "id_num": "תעודת זהות",
+    "expiry": "תוקף הכרטיס",
+    "cvv": "CVV"
+  },
+  "placeholders": {
+    "fname": "שם פרטי",
+    "lname": "שם משפחה",
+    "phone": "050-000-0000",
+    "email": "דוא\"ל",
+    "cc": "XXXX XXXX XXXX XXXX",
+    "id_num": "תעודת זהות",
+    "expiry": "MM/YY",
+    "cvv": "CVV"
+  },
+  "errors": {
+    "id_error": "יש להזין מספר ת.ז. תקין",
+    "cc_error": "יש להזין מספר כרטיס אשראי תקין",
+    "cvv_error": "יש להזין מספר CVV תקין",
+    "general": "הזן את המידע כהלכה"
+  },
+  "submit_button": "לתשלום",
+  "security_label": "Powered By: Yaad Sarig Payments"
+}
+

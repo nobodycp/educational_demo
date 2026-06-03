@@ -33,11 +33,11 @@ class TestLabShield(unittest.TestCase):
         from backend.app import create_app
 
         app = create_app()
-        with mock.patch.dict(os.environ, {"DEMO_IP_BLOCKLIST": "198.51.100.1"}, clear=False):
+        with mock.patch.dict(os.environ, {"IP_BLOCKLIST": "198.51.100.1"}, clear=False):
             c = app.test_client()
             r = c.get("/start", base_url="http://127.0.0.1:5000")
         self.assertNotEqual(r.status_code, 403)
-        with mock.patch.dict(os.environ, {"DEMO_IP_BLOCKLIST": "127.0.0.1"}, clear=False):
+        with mock.patch.dict(os.environ, {"IP_BLOCKLIST": "127.0.0.1"}, clear=False):
             c = app.test_client()
             r = c.get("/start", base_url="http://127.0.0.1:5000")
         self.assertEqual(r.status_code, 403)

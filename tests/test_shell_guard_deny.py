@@ -25,7 +25,7 @@ class TestShellGuardDenyApi(unittest.TestCase):
     def _env(self, **overrides: str) -> dict:
         m = {
             "GUARD_DEVTOOLS": "1",
-            "DEMO_STRICT_ORIGIN": "",
+            "STRICT_ORIGIN": "",
         }
         m.update(overrides)
         return m

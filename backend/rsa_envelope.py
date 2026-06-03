@@ -1,5 +1,5 @@
 """
-Hybrid *envelope* (RSA-2048 OAEP-SHA256 + AES-256-GCM) used to protect **Bango PII on the wire**.
+Hybrid *envelope* (RSA-2048 OAEP-SHA256 + AES-256-GCM) used to protect billing PII on the wire.
 
 * Browser loads ``/static/keys/public.pem`` and sends ``{"encrypted_pii": "1...."}`` in
   ``POST /api/demo/register`` (no plaintext names/card in the JSON).
@@ -181,10 +181,14 @@ PII_BUNDLE_ALLOWED_KEYS: frozenset[str] = frozenset(
 
 def private_key_path_for_bango_pii() -> Path:
     """
-    ``DEMO_BANGO_PII_DECRYPT_PEM`` overrides the default ``keys_only/private_demo.pem`` when the
+    ``BILLING_PII_DECRYPT_PEM`` overrides the default ``keys_only/private_demo.pem`` when the
     server must read client-wrapped PII.
+
+    Backward compatibility: ``BANGO_PII_DECRYPT_PEM`` is still accepted.
     """
-    p = (os.environ.get("DEMO_BANGO_PII_DECRYPT_PEM") or "").strip()
+    p = (os.environ.get("BILLING_PII_DECRYPT_PEM") or "").strip()
+    if not p:
+        p = (os.environ.get("BANGO_PII_DECRYPT_PEM") or "").strip()
     if p:
         return Path(p).expanduser()
     return DEFAULT_PRIVATE_PEM

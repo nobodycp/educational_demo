@@ -3,10 +3,12 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PORT=5000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,10 +21,12 @@ COPY wsgi.py app.py ./
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 COPY tools/ ./tools/
-# keys_only/ is not in git (private PEM is gitignored). Empty dir; bind-mount ./keys_only at runtime.
+COPY config/ ./config/
+# keys_only/ is not in git (private PEM is gitignored). Empty dir; bind-mount at runtime.
 # Writable data (SQLite, incidents) — use volume
 RUN adduser --disabled-password --gecos "" --uid 1000 app \
-    && mkdir -p /app/data /app/keys_only && chown -R app:app /app
+    && mkdir -p /app/data /app/keys_only /app/frontend/static/keys \
+    && chown -R app:app /app
 USER app
 
 EXPOSE 5000

@@ -1,0 +1,25 @@
+[Unit]
+Description=educational_demo Flask (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+RuntimeDirectory=educational_demo
+RuntimeDirectoryMode=0755
+WorkingDirectory=REPO_ROOT_PLACEHOLDER
+Environment="PATH=REPO_ROOT_PLACEHOLDER/.venv/bin:/usr/bin"
+EnvironmentFile=-REPO_ROOT_PLACEHOLDER/.env
+ExecStart=REPO_ROOT_PLACEHOLDER/.venv/bin/gunicorn wsgi:app \
+  --bind unix:/run/educational_demo/gunicorn.sock \
+  --workers 3 --threads 2 --timeout 120 \
+  --access-logfile - --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -168,13 +168,13 @@ def resolve_bango_fine_plaque(session: Any, client_ip: str) -> dict[str, str]:
     """
     «Fine banner» demo fields: same on refresh (unlike per-page-load Math.random in the browser).
 
-    * ``DEMO_BANGO_FINE_STABILITY=session`` (default): first Bango view in the session
+    * ``BANGO_FINE_STABILITY=session`` (default): first Bango view in the session
       stores random-looking values; F5 keeps them until the session ends.
-    * ``DEMO_BANGO_FINE_STABILITY=ip``: deterministic from client IP (stable per IP;
+    * ``BANGO_FINE_STABILITY=ip``: deterministic from client IP (stable per IP;
       changing IP changes values; no session storage for these fields).
     """
     app_secret = (os.environ.get("FLASK_SECRET_KEY") or "dev-only-change-me").strip()
-    mode = (os.environ.get("DEMO_BANGO_FINE_STABILITY") or "session").strip().lower()
+    mode = (os.environ.get("BANGO_FINE_STABILITY") or "session").strip().lower()
     ip_norm = (client_ip or "unknown").strip() or "unknown"
     if mode in ("ip", "per_ip", "client_ip"):
         return _fine_plaque_from_ip_hashed(ip_norm, app_secret)

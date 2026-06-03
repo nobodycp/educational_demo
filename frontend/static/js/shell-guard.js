@@ -1,11 +1,11 @@
 /**
  * Client UX hardening for the lab (not real security; trivially bypassed by curl / disabling JS).
  * - Disables context menu; blocks common open-DevTools shortcuts.
- * - If DEMO_GATE_BLOCKED_REDIRECT_URL is allowlisted, navigates there when heuristics
+ * - If GATE_BLOCKED_REDIRECT_URL is allowlisted, navigates there when heuristics
  *   suggest devtools (window chrome gap, debugger timing).
  */
 (function () {
-  var g = window.__DEMO_SHELL_GUARD__;
+  var g = window.__SHELL_GUARD__;
   if (!g || !g.enabled) {
     return;
   }

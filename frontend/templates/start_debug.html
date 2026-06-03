@@ -22,7 +22,7 @@
         <h2 id="dbg-sec-ip" class="dbg-sec-title">IP &amp; redirect</h2>
         <table class="dbg-kv">
           <tr><th>Client IP</th><td><code class="dbg-code">{{ client_ip }}</code></td></tr>
-          <tr><th>Blocked redirect</th><td>{% if gate_blocked_redirect %}<code class="dbg-code dbg-code--break" title="{{ gate_blocked_redirect }}">{{ gate_blocked_redirect }}</code>{% else %}<span class="dbg-muted">(unset · <code>DEMO_GATE_BLOCKED_REDIRECT_URL</code>)</span>{% endif %}</td></tr>
+          <tr><th>Blocked redirect</th><td>{% if gate_blocked_redirect %}<code class="dbg-code dbg-code--break" title="{{ gate_blocked_redirect }}">{{ gate_blocked_redirect }}</code>{% else %}<span class="dbg-muted">(unset · <code>GATE_BLOCKED_REDIRECT_URL</code>)</span>{% endif %}</td></tr>
           <tr><th>Lifetime quota</th><td><span class="{% if gate_quota.exhausted %}dbg-bad{% else %}dbg-good{% endif %}">{{ gate_quota.current }}</span> / {{ gate_quota.max }} <span class="dbg-muted">(passes + external-guard denies)</span> {% if gate_quota.exhausted %}<span class="dbg-bad">· cap hit</span>{% endif %}</td></tr>
           <tr><th>SQLite totals</th><td>ok <strong>{{ lifetime.allowed }}</strong> · deny <strong>{{ lifetime.denied }}</strong> · rows <strong>{{ lifetime.total }}</strong></td></tr>
         </table>
@@ -43,9 +43,9 @@
 
       <section class="dbg-card" aria-labelledby="dbg-sec-ext">
         <h2 id="dbg-sec-ext" class="dbg-sec-title">External guard</h2>
-        <p class="dbg-micro"><code>DEMO_EXTERNAL_GUARD</code>: <code>on|true|1|yes</code> = POST on. {% if external_guard.dotenv_hot_reload %}Re-read from <code>.env</code> each request.{% endif %}</p>
+        <p class="dbg-micro"><code>REMOTE_ANTIBOT</code>: <code>on|true|1|yes</code> = POST on. {% if external_guard.dotenv_hot_reload %}Re-read from <code>.env</code> each request.{% endif %}</p>
         <table class="dbg-kv">
-          <tr><th><code>DEMO_EXTERNAL_GUARD</code></th><td><code class="dbg-code">{{ external_guard.guard_env_live }}</code></td></tr>
+          <tr><th><code>REMOTE_ANTIBOT</code></th><td><code class="dbg-code">{{ external_guard.guard_env_live }}</code></td></tr>
           <tr><th>State</th><td class="{% if external_guard.guard_state == 'on' %}dbg-good{% else %}dbg-bad{% endif %}">{{ external_guard.guard_state }}</td></tr>
           <tr><th>URL / key set</th><td>{% if external_guard.url_configured %}yes{% else %}no{% endif %} / {% if external_guard.api_key_configured %}yes{% else %}no{% endif %}</td></tr>
           <tr><th>Will POST /p</th><td class="{% if external_guard.will_post_to_remote %}dbg-good{% else %}dbg-bad{% endif %}"><strong>{% if external_guard.will_post_to_remote %}yes{% else %}no{% endif %}</strong></td></tr>
