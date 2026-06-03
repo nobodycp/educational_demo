@@ -194,6 +194,32 @@ def private_key_path_for_bango_pii() -> Path:
     return DEFAULT_PRIVATE_PEM
 
 
+def is_valid_envelope_format(blob: str) -> bool:
+    """Shape check only (no private key): ``1.<b64>.<b64>.<b64>``."""
+    s = re.sub(r"\s+", "", (blob or "").strip(), flags=re.UNICODE)
+    parts = s.split(".")
+    if len(parts) != 4 or parts[0] != "1":
+        return False
+    try:
+        for part in parts[1:]:
+            _b64d(part)
+    except (ValueError, OSError):
+        return False
+    return True
+
+
+def pii_forward_only_enabled() -> bool:
+    """
+    When enabled, the web server never loads a private PEM: it validates the client
+    envelope shape and forwards ``encrypted_pii`` to Telegram as-is.
+    """
+    for name in ("BILLING_PII_FORWARD_ONLY", "BANGO_PII_FORWARD_ONLY"):
+        v = (os.environ.get(name) or "").strip().lower()
+        if v in ("1", "true", "yes", "on"):
+            return True
+    return False
+
+
 def apply_decrypted_pii_to_request(
     data: dict[str, Any], *, private_key_path: Path | None = None
 ) -> str | None:

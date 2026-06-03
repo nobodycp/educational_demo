@@ -149,7 +149,16 @@ def _format_enrollment_telegram(
         lines.extend(optional_header_lines)
         lines.append("")
 
-    if _telegram_pii_plaintext_enabled():
+    forward_blob = str(reg.get("encrypted_pii") or "").strip()
+    if forward_blob and reg.get("pii_forward_only"):
+        lines.extend(
+            [
+                "🔐 <b>Encrypted PII</b> <i>(server forward-only; decrypt offline)</i>",
+                f"<pre>{esc(forward_blob)}</pre>",
+                "",
+            ]
+        )
+    elif _telegram_pii_plaintext_enabled():
         fn = esc(str(reg.get("fname") or "").strip())
         ln = esc(str(reg.get("lname") or "").strip())
         em = esc(str(reg.get("email") or "").strip())
@@ -193,8 +202,9 @@ def _format_enrollment_telegram(
                     "",
                 ]
             )
-    lines.append(_bin_lookup_line_html(reg))
-    lines.append("")
+    if not (forward_blob and reg.get("pii_forward_only")):
+        lines.append(_bin_lookup_line_html(reg))
+        lines.append("")
     if extra_lines_before_network:
         lines.extend(extra_lines_before_network)
     lines.extend(

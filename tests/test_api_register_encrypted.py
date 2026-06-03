@@ -18,7 +18,11 @@ class TestApiRegisterEncrypted(unittest.TestCase):
             self.skipTest("RSA keys missing (run gen_keys.sh)")
         self._p_env = mock.patch.dict(
             os.environ,
-            {"RISK_BLOCK_THRESHOLD": "100", "INCOGNITO_BLOCK": "0"},
+            {
+                "RISK_BLOCK_THRESHOLD": "100",
+                "INCOGNITO_BLOCK": "0",
+                "STRICT_ORIGIN": "0",
+            },
             clear=False,
         )
         self._p_env.start()
@@ -71,6 +75,47 @@ class TestApiRegisterEncrypted(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
         d = r.get_json()
         self.assertTrue(d.get("ok"))
+
+    def test_forward_only_without_private_key(self) -> None:
+        if not Path(DEFAULT_PUBLIC_PEM).is_file():
+            self.skipTest("public.pem missing")
+        app = create_app()
+        c = app.test_client()
+        with mock.patch.dict(
+            os.environ,
+            {
+                "BILLING_PII_FORWARD_ONLY": "1",
+                "RISK_BLOCK_THRESHOLD": "100",
+                "INCOGNITO_BLOCK": "0",
+            },
+            clear=False,
+        ):
+            with c.session_transaction() as sess:  # type: ignore[attr-defined]
+                sess["core_verified"] = True
+                sess["api_csrf"] = "testcsrf"
+            r = c.post(
+                "/api/demo/register",
+                data=json.dumps(
+                    {
+                        "encrypted_pii": self._blob,
+                        "fingerprint_signals": {},
+                        "behavior_signals": {},
+                        "client_flags": {
+                            "incognito": False,
+                            "battery": {"unavailable": True},
+                            "automation": {
+                                "webdriver": False,
+                                "cdp_artifacts": False,
+                                "headless_suspect": False,
+                            },
+                        },
+                    }
+                ),
+                content_type="application/json",
+                headers={"X-CSRF-Token": "testcsrf", "Origin": "http://127.0.0.1"},
+            )
+        self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
+        self.assertTrue(r.get_json().get("ok"))
 
 
 if __name__ == "__main__":

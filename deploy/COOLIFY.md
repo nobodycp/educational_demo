@@ -39,18 +39,20 @@ Optional (if used):
 
 ## 4) Keys for encrypted PII (important)
 
-`/api/demo/register` expects a private key at `keys_only/private_demo.pem`.
+Browser encrypts registration PII with `frontend/static/keys/public.pem`.
 
-- Keep `private_demo.pem` out of git.
-- In Coolify, mount a persistent volume or file to:
-  - `/app/keys_only/private_demo.pem`
-- Ensure the matching public key is in repo at:
-  - `frontend/static/keys/public.pem`
-- Generate matching pair locally with:
-  - `./gen_keys.sh`
+**Recommended for Coolify (no private key on the web server):**
 
-If private key is missing or mismatched, registration returns:
-`bad_encrypted_pii`.
+- Set `BILLING_PII_FORWARD_ONLY=1` in Environment Variables.
+- Do **not** mount `private_demo.pem` on the app container.
+- Telegram receives the same `encrypted_pii` envelope from the browser.
+- Decrypt offline: `python tools/decrypt_telegram_pii.py '1.…'` with `keys_only/private_demo.pem`.
+
+**Legacy mode (private key on server):**
+
+- Mount `/app/keys_only/private_demo.pem` (matching `public.pem` in the image).
+- Leave `BILLING_PII_FORWARD_ONLY` empty.
+- If private key is missing or mismatched, registration returns `bad_encrypted_pii`.
 
 ## 5) Update flow
 

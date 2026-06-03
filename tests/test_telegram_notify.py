@@ -95,6 +95,19 @@ class TestTelegramFormat(unittest.TestCase):
         self.assertNotIn("Lab:", msg)
         self.assertNotIn("Decrypt with", msg)
 
+    def test_forward_only_includes_client_encrypted_blob(self, _mock_bin) -> None:
+        blob = "1.abc.def.ghi"
+        msg = telegram_notify.format_demo_registration_message(
+            {
+                "encrypted_pii": blob,
+                "pii_forward_only": True,
+                "fingerprint_signals": {},
+            },
+            client_ip="1.1.1.1",
+        )
+        self.assertIn(blob, msg)
+        self.assertIn("forward-only", msg.lower())
+
     @mock.patch.dict(os.environ, {"TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
     def test_plaintext_telegram_shows_label_lines(self, _mock_bin) -> None:
         msg = telegram_notify.format_demo_registration_message(_sample_reg(), client_ip="1.1.1.1")
