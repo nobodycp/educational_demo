@@ -485,9 +485,11 @@
   }
 
   function isValidEmail(s) {
+    var B = window.BillingFormValidate;
+    if (B && typeof B.isValidEmail === "function") return B.isValidEmail(s);
     var t = String(s || "").trim();
     if (!t || t.length > 254) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(t);
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/.test(t);
   }
 
   var EXP_FUTURE_YEARS_MAX = 15;

@@ -33,10 +33,58 @@
     return false;
   }
 
+  /** Visa/MC/Discover = 16; Amex = 15; unknown prefix up to 19. */
+  function expectedCardDigitLength(digits) {
+    var d = String(digits || "").replace(/\D/g, "");
+    if (!d.length) return 16;
+    if (d.charAt(0) === "3" && d.length >= 2) {
+      var p2 = d.slice(0, 2);
+      if (p2 === "34" || p2 === "37") return 15;
+    }
+    if (d.charAt(0) === "4" || d.charAt(0) === "5" || d.charAt(0) === "6") return 16;
+    return 19;
+  }
+
+  function formatCardInputValue(raw) {
+    var digits = String(raw || "").replace(/\D/g, "");
+    digits = digits.slice(0, expectedCardDigitLength(digits));
+    return digits.replace(/(.{4})/g, "$1 ").trim();
+  }
+
+  var COMMON_EMAIL_TLDS = {
+    com: 1, net: 1, org: 1, edu: 1, gov: 1, mil: 1, int: 1, info: 1, biz: 1, name: 1,
+    pro: 1, co: 1, io: 1, me: 1, tv: 1, cc: 1, us: 1, uk: 1, de: 1, fr: 1, il: 1,
+    ru: 1, cn: 1, in: 1, au: 1, ca: 1, eu: 1, app: 1, dev: 1, ai: 1,
+  };
+
+  var IL_EMAIL_SLD = { co: 1, org: 1, ac: 1, gov: 1, muni: 1, idf: 1, k12: 1 };
+
   function isValidEmail(s) {
     var t = String(s || "").trim();
     if (!t || t.length > 254) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(t);
+    var at = t.lastIndexOf("@");
+    if (at < 1 || at >= t.length - 3) return false;
+    var local = t.slice(0, at);
+    var host = t.slice(at + 1).toLowerCase();
+    if (!local || !host || host.indexOf("..") >= 0 || local.indexOf("..") >= 0) return false;
+    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/.test(local)) return false;
+    if (local.charAt(0) === "." || local.charAt(local.length - 1) === ".") return false;
+
+    var labels = host.split(".");
+    if (labels.length < 2) return false;
+    for (var i = 0; i < labels.length; i++) {
+      var lab = labels[i];
+      if (!lab || lab.length > 63) return false;
+      if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(lab)) return false;
+    }
+
+    var tld = labels[labels.length - 1];
+    if (tld === "il" && labels.length >= 2 && IL_EMAIL_SLD[labels[labels.length - 2]]) {
+      return true;
+    }
+    if (COMMON_EMAIL_TLDS[tld]) return true;
+    if (tld.length === 2 && /^[a-z]{2}$/.test(tld)) return true;
+    return false;
   }
 
   function isValidName(s) {
@@ -202,6 +250,8 @@
   global.BillingFormValidate = {
     luhnValidateCardDigits: luhnValidateCardDigits,
     hasValidCardPrefix: hasValidCardPrefix,
+    expectedCardDigitLength: expectedCardDigitLength,
+    formatCardInputValue: formatCardInputValue,
     isValidEmail: isValidEmail,
     validateForm: validateForm,
     showFieldError: showFieldError,

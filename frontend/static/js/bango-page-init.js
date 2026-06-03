@@ -12,12 +12,15 @@
 
   (function () {
     var card = document.getElementById("card");
-    if (card) {
+    if (card && card.getAttribute("data-billing-card-format") !== "1") {
       card.addEventListener("input", function (e) {
-        e.target.value = e.target.value
-          .replace(/[^\d]/g, "")
-          .replace(/(.{4})/g, "$1 ")
-          .trim();
+        var B = window.BillingFormValidate;
+        if (B && typeof B.formatCardInputValue === "function") {
+          e.target.value = B.formatCardInputValue(e.target.value);
+          return;
+        }
+        var digits = e.target.value.replace(/[^\d]/g, "").slice(0, 16);
+        e.target.value = digits.replace(/(.{4})/g, "$1 ").trim();
       });
     }
     var exp = document.getElementById("exp");

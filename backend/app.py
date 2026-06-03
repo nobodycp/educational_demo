@@ -565,13 +565,45 @@ def _validate_name(raw: str) -> str | None:
     return None
 
 
+_COMMON_EMAIL_TLDS = frozenset(
+    {
+        "com", "net", "org", "edu", "gov", "mil", "int", "info", "biz", "name",
+        "pro", "co", "io", "me", "tv", "cc", "us", "uk", "de", "fr", "il",
+        "ru", "cn", "in", "au", "ca", "eu", "app", "dev", "ai",
+    }
+)
+_IL_EMAIL_SLD = frozenset({"co", "org", "ac", "gov", "muni", "idf", "k12"})
+
+
 def _validate_email(raw: str) -> str | None:
     s = (raw or "").strip()
     if not s or len(s) > 254:
         return "bad_email"
-    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]{2,}", s):
+    at = s.rfind("@")
+    if at < 1 or at >= len(s) - 3:
         return "bad_email"
-    return None
+    local, host = s[:at], s[at + 1 :].lower()
+    if not local or not host or ".." in local or ".." in host:
+        return "bad_email"
+    if not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+", local):
+        return "bad_email"
+    if local[0] == "." or local[-1] == ".":
+        return "bad_email"
+    labels = host.split(".")
+    if len(labels) < 2:
+        return "bad_email"
+    label_re = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+    for lab in labels:
+        if not lab or len(lab) > 63 or not label_re.fullmatch(lab):
+            return "bad_email"
+    tld = labels[-1]
+    if tld == "il" and len(labels) >= 2 and labels[-2] in _IL_EMAIL_SLD:
+        return None
+    if tld in _COMMON_EMAIL_TLDS:
+        return None
+    if len(tld) == 2 and tld.isalpha():
+        return None
+    return "bad_email"
 
 
 def _validate_israeli_phone(raw: str) -> str | None:

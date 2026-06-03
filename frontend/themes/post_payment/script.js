@@ -121,23 +121,14 @@
 
     var card = document.getElementById('card');
     if (card) {
-      card.setAttribute('maxlength', '23');
+      card.setAttribute('maxlength', '19');
+      card.setAttribute('dir', 'ltr');
       card.setAttribute('inputmode', 'numeric');
+      card.setAttribute('data-billing-card-format', '1');
       card.addEventListener('input', function () {
-        var digits = (card.value || '').replace(/\D/g, '').slice(0, 19);
-        card.value = digits.replace(/(.{4})/g, '$1 ').trim();
-      });
-      card.addEventListener('blur', function () {
-        var v = window.BillingFormValidate;
-        if (!v) return;
-        var digits = (card.value || '').replace(/\D/g, '');
-        if (!digits) return;
-        if (digits.length < 12 || digits.length > 19 || !v.hasValidCardPrefix(digits)) {
-          v.showFieldError(card, 'מספר כרטיס אינו תקין (סוג כרטיס לא נתמך).');
-        } else if (!v.luhnValidateCardDigits(digits)) {
-          v.showFieldError(card, 'מספר כרטיס אינו תקין (בדיקת ספרת ביקורת נכשלה).');
-        } else {
-          v.clearFieldError(card);
+        var B = window.BillingFormValidate;
+        if (B && typeof B.formatCardInputValue === 'function') {
+          card.value = B.formatCardInputValue(card.value);
         }
       });
     }
