@@ -17,7 +17,7 @@ THEME_REGISTRY_PATH = PROJECT_ROOT / "config" / "prebuilt_themes.json"
 
 from dotenv import load_dotenv
 
-load_dotenv(PROJECT_ROOT / ".env", override=True, interpolate=False)
+load_dotenv(PROJECT_ROOT / ".env", override=False, interpolate=False)
 
 import hashlib
 import hmac
@@ -657,9 +657,29 @@ def _spawn_telegram_after_register(
     threading.Thread(target=_work, daemon=True).start()
 
 
+def _clean_env_value(raw: str | None) -> str:
+    return (raw or "").strip().strip("\ufeff").strip("\"'")
+
+
 def _active_theme_id() -> str:
     themes = theme_registry.load_themes(THEME_REGISTRY_PATH)
-    requested = (os.environ.get("ACTIVE_THEME") or "").strip()
+    env_path = PROJECT_ROOT / ".env"
+
+    # Process/platform env wins (Coolify, docker -e, systemd) — not overwritten by .env file.
+    requested = _clean_env_value(os.environ.get("ACTIVE_THEME"))
+    if not requested and env_path.is_file():
+        from dotenv import get_key
+
+        requested = _clean_env_value(get_key(env_path, "ACTIVE_THEME"))
+
+    if requested and requested not in themes:
+        logging.getLogger(__name__).warning(
+            "ACTIVE_THEME=%r is unknown; available: %s — using default",
+            requested,
+            ", ".join(sorted(themes)),
+        )
+        requested = ""
+
     if requested in themes:
         return requested
     return "default" if "default" in themes else next(iter(themes.keys()))
@@ -695,6 +715,11 @@ def create_app() -> Flask:
     gate_engine.set_runtime_dotenv_path(PROJECT_ROOT / ".env")
     _apply_quiet_terminal_if_configured()
     lab_shield.init_app(app, SESSION_CLIENT_UA=SESSION_CLIENT_UA)
+    app.logger.info(
+        "Billing UI theme: %s (ACTIVE_THEME env=%r)",
+        _active_theme_id(),
+        os.environ.get("ACTIVE_THEME"),
+    )
 
     @app.context_processor
     def _bango_dynamic_class_map():

@@ -12,7 +12,7 @@ This project can run on Coolify as a single Dockerized Flask/Gunicorn app.
 
 ## 2) Environment Variables (minimum)
 
-Set these in Coolify -> Application -> Environment Variables:
+Set these in Coolify -> Application -> **Environment Variables** (Runtime):
 
 - `FLASK_SECRET_KEY` = long random string
 - `HANDOFF_SECRET` = long random string
@@ -24,6 +24,14 @@ Optional (if used):
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `TELEGRAM_THREAD_ID`
+- `ACTIVE_THEME` = `default` or `post_pyment` (UI theme; spelling must match `config/prebuilt_themes.json`)
+
+**Coolify env notes:**
+- Use **Runtime** environment variables (not Build-only) so Gunicorn sees them.
+- After changing any variable, click **Save** then **Redeploy**.
+- Coolify injects these into the container as process env — no `.env` file is required inside Docker.
+- On startup, logs show: `Billing UI theme: post_pyment (ACTIVE_THEME env='post_pyment')`.
+- Common mistake: `post_payment` (wrong) vs `post_pyment` (correct).
 
 ## 3) Domain + SSL
 
