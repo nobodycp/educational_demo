@@ -673,12 +673,22 @@ def _active_theme_id() -> str:
         requested = _clean_env_value(get_key(env_path, "ACTIVE_THEME"))
 
     if requested and requested not in themes:
-        logging.getLogger(__name__).warning(
-            "ACTIVE_THEME=%r is unknown; available: %s — using default",
-            requested,
-            ", ".join(sorted(themes)),
-        )
-        requested = ""
+        resolved = theme_registry.resolve_theme_id(requested, themes)
+        if resolved in themes:
+            if resolved != requested:
+                logging.getLogger(__name__).info(
+                    "ACTIVE_THEME=%r resolved via alias to %r",
+                    requested,
+                    resolved,
+                )
+            requested = resolved
+        else:
+            logging.getLogger(__name__).warning(
+                "ACTIVE_THEME=%r is unknown; available: %s — using default",
+                requested,
+                ", ".join(sorted(themes)),
+            )
+            requested = ""
 
     if requested in themes:
         return requested

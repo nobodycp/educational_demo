@@ -31,7 +31,7 @@ Optional (if used):
 - After changing any variable, click **Save** then **Redeploy**.
 - Coolify injects these into the container as process env — no `.env` file is required inside Docker.
 - On startup, logs show: `Billing UI theme: post_pyment (ACTIVE_THEME env='post_pyment')`.
-- Common mistake: `post_payment` (wrong) vs `post_pyment` (correct).
+- Common mistake: use `post_pyment` (folder name) or `post_payment` (alias).
 
 ## 3) Domain + SSL
 

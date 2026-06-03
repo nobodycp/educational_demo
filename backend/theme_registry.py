@@ -16,6 +16,25 @@ DEFAULT_THEMES = {
 }
 
 
+# Common misspellings / alternate names for theme ids in config/prebuilt_themes.json.
+THEME_ALIASES: dict[str, str] = {
+    "post_payment": "post_pyment",
+    "post-payment": "post_pyment",
+}
+
+
+def resolve_theme_id(requested: str, themes: dict[str, dict[str, Any]]) -> str:
+    key = (requested or "").strip()
+    if not key:
+        return ""
+    if key in themes:
+        return key
+    alias = THEME_ALIASES.get(key.lower())
+    if alias and alias in themes:
+        return alias
+    return key
+
+
 def load_themes(path: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return dict(DEFAULT_THEMES)
