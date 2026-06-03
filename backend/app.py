@@ -57,6 +57,7 @@ from backend import (
     theme_registry,
     ua_parse,
 )
+from backend.client_ip import resolve_client_ip
 from backend.json_random_response import make_randomized_json_response
 
 HANDOFF_COOKIE = "edu_demo_handoff"
@@ -316,50 +317,8 @@ def _external_base_url() -> str:
 
 
 def _client_ip_for_lab() -> str:
-    """
-    Resolve the real client IP behind reverse proxies (Cloudflare / Traefik / Nginx).
-
-    Prefer proxy headers only when Flask sees a private/loopback peer address
-    (typical in container stacks). This avoids trusting spoofed public headers when
-    the app is directly internet-facing.
-    """
-    def _normalize(ip_raw: str | None) -> str | None:
-        raw = (ip_raw or "").strip()
-        if not raw:
-            return None
-        if raw in ("::1", "0:0:0:0:0:0:0:1"):
-            return "127.0.0.1"
-        try:
-            return str(ipaddress.ip_address(raw))
-        except ValueError:
-            return None
-
-    remote = _normalize(request.remote_addr)
-    if remote is None:
-        return "unknown"
-
-    try:
-        remote_ip = ipaddress.ip_address(remote)
-    except ValueError:
-        return remote
-
-    # In proxied/container setups, Flask usually sees an internal/private hop.
-    trust_forwarded = remote_ip.is_private or remote_ip.is_loopback or remote_ip.is_link_local
-    if trust_forwarded:
-        cf_ip = _normalize(request.headers.get("CF-Connecting-IP"))
-        if cf_ip:
-            return cf_ip
-        xff = (request.headers.get("X-Forwarded-For") or "").strip()
-        if xff:
-            first = xff.split(",")[0].strip()
-            xff_ip = _normalize(first)
-            if xff_ip:
-                return xff_ip
-        real_ip = _normalize(request.headers.get("X-Real-IP"))
-        if real_ip:
-            return real_ip
-
-    return remote
+    """Visitor IP for gate audit, quotas, and debug (see ``backend.client_ip``)."""
+    return resolve_client_ip(request)
 
 
 def _gate_blocked_redirect_url() -> str | None:
@@ -741,7 +700,8 @@ def create_app() -> Flask:
     )
     from werkzeug.middleware.proxy_fix import ProxyFix
 
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    # Do not set x_for: IP is resolved in backend.client_ip (CF-Connecting-IP, XFF).
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
     # Allow rendering templates from frontend/themes/<theme>/index.html
     app.jinja_loader = ChoiceLoader(
         [

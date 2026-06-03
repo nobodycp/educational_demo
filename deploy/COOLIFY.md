@@ -48,6 +48,8 @@ Optional (if used):
 
 Debug dashboard: `/start?test=1234` (change `START_DEBUG_SECRET` in production).
 
+**Client IP behind Cloudflare:** Debug shows the visitor IP from `CF-Connecting-IP`, not the Cloudflare edge (e.g. `172.70.x.x`). If you still see proxy IPs, ensure Cloudflare orange-cloud is on and redeploy latest `main`.
+
 ## 3) Domain + SSL
 
 - Add your application domain in Coolify (for example `app.example.com`)

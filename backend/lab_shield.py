@@ -23,6 +23,7 @@ from markupsafe import Markup
 from werkzeug import Response
 
 from backend import gate_engine
+from backend.client_ip import resolve_client_ip
 
 
 def _truthy(name: str) -> bool:
@@ -46,10 +47,9 @@ def _ip_blocklist() -> frozenset[str]:
 
 
 def _client_ip() -> str:
-    raw = (request.remote_addr or "").strip() or "unknown"
-    if raw in ("::1", "0:0:0:0:0:0:0:1"):
-        return "127.0.0.1"
-    return raw
+    if has_request_context():
+        return resolve_client_ip(request)
+    return "unknown"
 
 
 def _shuffled_error(body: dict, status: int) -> object:
