@@ -32,7 +32,7 @@ class TestApiRegisterEncrypted(unittest.TestCase):
                 "fname": "Ab",
                 "lname": "Cd",
                 "phone": "0501234567",
-                "email": "a@b.c",
+                "email": "user@example.com",
                 "personal_id": "123456789",
                 "full_name": "Ab Cd",
                 "cc": "4111111111111111",

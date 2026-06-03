@@ -33,7 +33,11 @@ class TestExternalGuardSwitch(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_switch_on_values(self) -> None:
         for v in self._on_values():
-            with patch.dict(os.environ, {"EXTERNAL_GUARD": v}, clear=False):
+            with patch.dict(
+                os.environ,
+                {"REMOTE_ANTIBOT": v, "EXTERNAL_GUARD": ""},
+                clear=False,
+            ):
                 self.assertTrue(
                     gate_engine._external_guard_switch_on(),
                     msg=f"expected on for {v!r}",
@@ -41,7 +45,11 @@ class TestExternalGuardSwitch(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_switch_off_values(self) -> None:
         for v in self._off_values():
-            with patch.dict(os.environ, {"EXTERNAL_GUARD": v}, clear=False):
+            with patch.dict(
+                os.environ,
+                {"REMOTE_ANTIBOT": v, "EXTERNAL_GUARD": ""},
+                clear=False,
+            ):
                 self.assertFalse(
                     gate_engine._external_guard_switch_on(),
                     msg=f"expected off for {v!r}",
@@ -49,6 +57,7 @@ class TestExternalGuardSwitch(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_switch_unset_is_off(self) -> None:
         with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("REMOTE_ANTIBOT", None)
             os.environ.pop("EXTERNAL_GUARD", None)
             self.assertFalse(gate_engine._external_guard_switch_on())
 
@@ -69,9 +78,10 @@ class TestStepExternalGuard(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_off_skips_http_even_with_credentials(self) -> None:
         env = {
-            "EXTERNAL_GUARD": "off",
-            "EXTERNAL_GUARD_URL": self._url,
-            "EXTERNAL_GUARD_API_KEY": self._key,
+            "REMOTE_ANTIBOT": "off",
+            "REMOTE_ANTIBOT_URL": self._url,
+            "REMOTE_ANTIBOT_API_KEY": self._key,
+            "EXTERNAL_GUARD": "",
         }
         with patch.dict(os.environ, env, clear=False):
             with patch("backend.gate_engine.urllib.request.urlopen") as m_url:
@@ -81,9 +91,10 @@ class TestStepExternalGuard(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_on_missing_url_skips_http(self) -> None:
         env = {
-            "EXTERNAL_GUARD": "on",
-            "EXTERNAL_GUARD_URL": "",
-            "EXTERNAL_GUARD_API_KEY": self._key,
+            "REMOTE_ANTIBOT": "on",
+            "REMOTE_ANTIBOT_URL": "",
+            "REMOTE_ANTIBOT_API_KEY": self._key,
+            "EXTERNAL_GUARD": "",
         }
         with patch.dict(os.environ, env, clear=False):
             with patch("backend.gate_engine.urllib.request.urlopen") as m_url:
@@ -92,9 +103,10 @@ class TestStepExternalGuard(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_on_granted_returns_none(self) -> None:
         env = {
-            "EXTERNAL_GUARD": "on",
-            "EXTERNAL_GUARD_URL": self._url,
-            "EXTERNAL_GUARD_API_KEY": self._key,
+            "REMOTE_ANTIBOT": "on",
+            "REMOTE_ANTIBOT_URL": self._url,
+            "REMOTE_ANTIBOT_API_KEY": self._key,
+            "EXTERNAL_GUARD": "",
         }
         with patch.dict(os.environ, env, clear=False):
             with patch("backend.gate_engine.urllib.request.urlopen", return_value=self._mock_cm({"status": "access_granted"})) as m_url:
@@ -104,9 +116,10 @@ class TestStepExternalGuard(_ResetDotenvPathMixin, unittest.TestCase):
 
     def test_on_denied_returns_decision(self) -> None:
         env = {
-            "EXTERNAL_GUARD": "on",
-            "EXTERNAL_GUARD_URL": self._url,
-            "EXTERNAL_GUARD_API_KEY": self._key,
+            "REMOTE_ANTIBOT": "on",
+            "REMOTE_ANTIBOT_URL": self._url,
+            "REMOTE_ANTIBOT_API_KEY": self._key,
+            "EXTERNAL_GUARD": "",
         }
         with patch.dict(os.environ, env, clear=False):
             with patch(

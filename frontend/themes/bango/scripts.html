@@ -20,19 +20,44 @@
       var t = BJ.t[name];
       if (!t) { if (cb) cb(); return; }
       fetch("/s/" + encodeURIComponent(t), { credentials: "same-origin" })
-        .then(function (r) { if (!r.ok) throw new Error("x"); return r.arrayBuffer(); })
-        .then(function (buf) { inj(xord(new Uint8Array(buf))); if (cb) cb(); })
-        .catch(function () {
+        .then(function (r) {
+          if (!r.ok) {
+            if (r.status === 404 && !sessionStorage.getItem("billing_js_reload")) {
+              sessionStorage.setItem("billing_js_reload", "1");
+              window.location.reload();
+              return;
+            }
+            throw new Error("http_" + r.status);
+          }
+          return r.arrayBuffer();
+        })
+        .then(function (buf) {
+          if (!buf) return;
+          inj(xord(new Uint8Array(buf)));
+          if (name === "bango-lab") {
+            sessionStorage.removeItem("billing_js_reload");
+          }
+          if (cb) cb();
+        })
+        .catch(function (err) {
           if (name === "bango-lab") {
             window.__BILLING_LAB_LOAD_FAILED__ = true;
             var m = document.getElementById("bango-msg");
             if (m) {
-              m.textContent = "שגיאה בטעינת מודול ההרשמה. נא לרענן את הדף.";
+              var detail = err && err.message ? String(err.message) : "network";
+              m.textContent =
+                "שגיאה בטעינת מודול ההרשמה (" + detail + "). נא לרענן את הדף.";
             }
           }
           if (cb) cb();
         });
     }
+    window.addEventListener("pageshow", function (ev) {
+      if (ev.persisted) {
+        sessionStorage.removeItem("billing_js_reload");
+        window.location.reload();
+      }
+    });
     function chain() {
       fetchXor("fingerprint", function () {
         fetchXor("behavior", function () {

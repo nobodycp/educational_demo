@@ -78,35 +78,6 @@
     return t.length >= 3 && t.length <= 4 && /^\d+$/.test(t);
   }
 
-  function isValidName(s) {
-    var t = String(s || "").trim();
-    if (t.length < 2) return false;
-    return /^[A-Za-zא-ת\s]+$/.test(t);
-  }
-
-  function isValidIsraeliPhone(s) {
-    var t = String(s || "").replace(/\D/g, "");
-    if (t.length !== 10) return false;
-    return /^(050|051|052|053|054|055|058)/.test(t);
-  }
-
-  function isValidIsraeliId(s) {
-    var t = String(s || "").replace(/\D/g, "");
-    return t.length === 9 && /^\d{9}$/.test(t);
-  }
-
-  function isValidCardDigits(s) {
-    var t = String(s || "").replace(/\D/g, "");
-    if (t.length < 12 || t.length > 19 || !/^\d+$/.test(t)) return false;
-    if (!hasValidCardPrefix(t)) return false;
-    return luhnValidateCardDigits(t);
-  }
-
-  function isValidCvv(s) {
-    var t = String(s || "").replace(/\D/g, "");
-    return t.length >= 3 && t.length <= 4 && /^\d+$/.test(t);
-  }
-
   var LOADING_SECONDS = 20;
   /** משך מסך «הפעולה הושלמה» לפני location.replace (מילי־שניות) */
   var BANGO_SUCCESS_PRE_REDIRECT_MS = 2800;
@@ -515,8 +486,8 @@
 
   function isValidEmail(s) {
     var t = String(s || "").trim();
-    if (!t) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+    if (!t || t.length > 254) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(t);
   }
 
   var EXP_FUTURE_YEARS_MAX = 15;
@@ -697,9 +668,22 @@
     }
   }
 
+  function resolveBillingForm() {
+    var jsUi = window.__BILLING_UI_CLASSES__ || window.__BANGO_UI_CLASSES__ || {};
+    if (jsUi.formId) {
+      var byId = document.getElementById(jsUi.formId);
+      if (byId) return byId;
+    }
+    return document.querySelector("form.Yform") || document.getElementById(FORM_ID) || null;
+  }
+
   function wire() {
-    var form = document.getElementById(FORM_ID);
-    if (!form) return;
+    var form = resolveBillingForm();
+    if (!form) {
+      window.__BILLING_LAB_WIRED__ = false;
+      window.__BILLING_LAB_READY__ = false;
+      return;
+    }
     stripNonDigits(document.getElementById("phone"));
     stripNonDigits(document.getElementById("id_num"));
     stripNonDigits(document.getElementById("cvv"));
@@ -860,6 +844,8 @@
           setMsg("Error: " + m);
         });
     });
+    window.__BILLING_LAB_WIRED__ = true;
+    window.__BILLING_LAB_READY__ = true;
   }
 
   if (document.readyState === "loading") {
@@ -867,5 +853,4 @@
   } else {
     wire();
   }
-  window.__BILLING_LAB_READY__ = true;
 })();

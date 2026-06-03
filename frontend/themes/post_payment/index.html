@@ -128,6 +128,7 @@
   {% include 'shared/billing_overlays.html' %}
 
   {% include 'bango/scripts.html' %}
+  <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}" src="/static/js/billing-form-validate.js"></script>
   <script nonce="{{ billing_csp_nonce or bango_csp_nonce }}" src="{{ url_for('theme_asset', theme_name=active_theme_id, filename='script.js') }}"></script>
 </body>
 </html>

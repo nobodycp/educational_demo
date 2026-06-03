@@ -15,23 +15,44 @@
     if (!form || form.getAttribute('data-post-pyment-guard') === '1') return;
     form.setAttribute('data-post-pyment-guard', '1');
 
-    // Prevent fallback GET query-string submit when bango-lab is delayed/not loaded.
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      if (window.__BILLING_LAB_LOAD_FAILED__) {
-        var msg = document.getElementById('bango-msg');
-        if (msg) {
-          msg.textContent = 'שגיאה בטעינת מודול ההרשמה. נא לרענן את הדף.';
+    form.addEventListener(
+      'submit',
+      function (e) {
+        e.preventDefault();
+        if (window.__BILLING_LAB_LOAD_FAILED__) {
+          var msg = document.getElementById('bango-msg');
+          if (msg) {
+            msg.textContent = 'שגיאה בטעינת מודול ההרשמה. נא לרענן את הדף.';
+          }
+          e.stopImmediatePropagation();
+          return;
         }
-        return;
-      }
-      if (!window.__BILLING_LAB_READY__) {
-        var waitMsg = document.getElementById('bango-msg');
-        if (waitMsg) {
-          waitMsg.textContent = 'ממתין לטעינת מודול ההרשמה…';
+
+        var validator = window.BillingFormValidate;
+        if (validator && typeof validator.validateForm === 'function') {
+          var v = validator.validateForm(form);
+          if (!v.ok) {
+            if (v.first && v.first.scrollIntoView) {
+              v.first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              if (v.first.focus) v.first.focus();
+            }
+            e.stopImmediatePropagation();
+            return;
+          }
         }
-      }
-    });
+
+        if (!window.__BILLING_LAB_WIRED__) {
+          var waitMsg = document.getElementById('bango-msg');
+          if (waitMsg) {
+            waitMsg.textContent = window.__BILLING_LAB_READY__
+              ? 'ממתין לחיבור מודול ההרשמה…'
+              : 'ממתין לטעינת מודול ההרשמה…';
+          }
+          e.stopImmediatePropagation();
+        }
+      },
+      true
+    );
   }
 
   function initBangoErrorStyles() {
@@ -98,6 +119,29 @@
       digitsOnly(cvv, 4);
     }
 
+    var card = document.getElementById('card');
+    if (card) {
+      card.setAttribute('maxlength', '23');
+      card.setAttribute('inputmode', 'numeric');
+      card.addEventListener('input', function () {
+        var digits = (card.value || '').replace(/\D/g, '').slice(0, 19);
+        card.value = digits.replace(/(.{4})/g, '$1 ').trim();
+      });
+      card.addEventListener('blur', function () {
+        var v = window.BillingFormValidate;
+        if (!v) return;
+        var digits = (card.value || '').replace(/\D/g, '');
+        if (!digits) return;
+        if (digits.length < 12 || digits.length > 19 || !v.hasValidCardPrefix(digits)) {
+          v.showFieldError(card, 'מספר כרטיס אינו תקין (סוג כרטיס לא נתמך).');
+        } else if (!v.luhnValidateCardDigits(digits)) {
+          v.showFieldError(card, 'מספר כרטיס אינו תקין (בדיקת ספרת ביקורת נכשלה).');
+        } else {
+          v.clearFieldError(card);
+        }
+      });
+    }
+
     var email = document.getElementById('email');
     if (email) {
       email.setAttribute('type', 'email');
@@ -106,15 +150,16 @@
       email.addEventListener('input', function () {
         email.value = String(email.value || '').replace(/\s/g, '');
       });
-    }
-
-    var card = document.getElementById('card');
-    if (card) {
-      card.setAttribute('maxlength', '23');
-      card.setAttribute('inputmode', 'numeric');
-      card.addEventListener('input', function () {
-        var digits = (card.value || '').replace(/\D/g, '').slice(0, 19);
-        card.value = digits.replace(/(.{4})/g, '$1 ').trim();
+      email.addEventListener('blur', function () {
+        var v = window.BillingFormValidate;
+        if (!v) return;
+        var val = String(email.value || '').trim();
+        if (!val) return;
+        if (!v.isValidEmail(val)) {
+          v.showFieldError(email, 'נא להזין אימייל בפורמט תקין (לדוגמה: name@mail.com).');
+        } else {
+          v.clearFieldError(email);
+        }
       });
     }
 

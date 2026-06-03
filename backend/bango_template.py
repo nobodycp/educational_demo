@@ -50,6 +50,23 @@ BANGO_CLASS_LOGICAL: tuple[str, ...] = (
 )
 
 
+def _required_billing_js_logical(*, shell_guard: bool) -> tuple[str, ...]:
+    names = ["fingerprint", "behavior"]
+    if shell_guard:
+        names.append("shell-guard")
+    names.extend(
+        ["incognito-hint", "lab-busy", "bango-crypto", "bango-page-init", "bango-lab"]
+    )
+    return tuple(names)
+
+
+def _billing_js_bundle_valid(rev: Any, *, shell_guard: bool) -> bool:
+    if not isinstance(rev, dict) or not rev:
+        return False
+    have = {str(v) for v in rev.values()}
+    return all(name in have for name in _required_billing_js_logical(shell_guard=shell_guard))
+
+
 def build_bango_template_context(session: Any) -> dict[str, Any]:
     """
     Per-request: random XOR key, class map, shell-guard HTML, JS lookup for
@@ -60,36 +77,57 @@ def build_bango_template_context(session: Any) -> dict[str, Any]:
         SESSION_API_CSRF,
         SESSION_BILLING_CSP,
         SESSION_BILLING_JS,
+        SESSION_CORE_OK,
         _bango_shell_inject_script_tags,
         _shell_guard_enabled,
     )
 
-    xor_key = secrets.token_hex(8)
-    ui_map = gate_engine.build_ui_class_map(list(BANGO_CLASS_LOGICAL), xor_key)
+    shell_on = _shell_guard_enabled()
+    existing = session.get(SESSION_BILLING_JS) or {}
+    rev_existing = existing.get("rev") if isinstance(existing, dict) else None
+    ui_map_existing = existing.get("ui_map") if isinstance(existing, dict) else None
+    xor_existing = existing.get("k") if isinstance(existing, dict) else None
+
+    if (
+        session.get(SESSION_CORE_OK) is True
+        and isinstance(xor_existing, str)
+        and xor_existing
+        and isinstance(ui_map_existing, dict)
+        and ui_map_existing
+        and _billing_js_bundle_valid(rev_existing, shell_guard=shell_on)
+    ):
+        xor_key = xor_existing
+        ui_map = ui_map_existing
+        rev = rev_existing
+        bango_js_tokens = {str(logical): str(tok) for tok, logical in rev.items()}
+    else:
+        xor_key = secrets.token_hex(8)
+        ui_map = gate_engine.build_ui_class_map(list(BANGO_CLASS_LOGICAL), xor_key)
+        rev = {}
+        bango_js_tokens = {}
+
+        def _bango_add_js_token(logical: str) -> None:
+            tok = secrets.token_urlsafe(18)
+            rev[tok] = logical
+            bango_js_tokens[logical] = tok
+
+        for _name in ("fingerprint", "behavior"):
+            _bango_add_js_token(_name)
+        if shell_on:
+            _bango_add_js_token("shell-guard")
+        for _name in (
+            "incognito-hint",
+            "lab-busy",
+            "bango-crypto",
+            "bango-page-init",
+            "bango-lab",
+        ):
+            _bango_add_js_token(_name)
+        session[SESSION_BILLING_JS] = {"k": xor_key, "rev": rev, "ui_map": ui_map}
+
     report = str(session.get(SESSION_API_CSRF) or "")
     ui_json = json.dumps(ui_map, ensure_ascii=False, separators=(",", ":"))
     csp_nonce = secrets.token_urlsafe(16)
-    rev: dict[str, str] = {}
-    bango_js_tokens: dict[str, str] = {}
-
-    def _bango_add_js_token(logical: str) -> None:
-        tok = secrets.token_urlsafe(18)
-        rev[tok] = logical
-        bango_js_tokens[logical] = tok
-
-    for _name in ("fingerprint", "behavior"):
-        _bango_add_js_token(_name)
-    if _shell_guard_enabled():
-        _bango_add_js_token("shell-guard")
-    for _name in (
-        "incognito-hint",
-        "lab-busy",
-        "bango-crypto",
-        "bango-page-init",
-        "bango-lab",
-    ):
-        _bango_add_js_token(_name)
-    session[SESSION_BILLING_JS] = {"k": xor_key, "rev": rev}
     session[SESSION_BILLING_CSP] = bango_hardening.build_bango_csp_header(csp_nonce)
     from flask import has_request_context
 

@@ -565,6 +565,15 @@ def _validate_name(raw: str) -> str | None:
     return None
 
 
+def _validate_email(raw: str) -> str | None:
+    s = (raw or "").strip()
+    if not s or len(s) > 254:
+        return "bad_email"
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]{2,}", s):
+        return "bad_email"
+    return None
+
+
 def _validate_israeli_phone(raw: str) -> str | None:
     s = re.sub(r"\D", "", raw or "")
     if len(s) != 10:
@@ -1019,7 +1028,10 @@ def create_app() -> Flask:
                 active_theme_label=str(theme_meta.get("label") or active_theme),
             ),
             200,
-            {"Content-Type": "text/html; charset=utf-8"},
+            {
+                "Content-Type": "text/html; charset=utf-8",
+                "Cache-Control": "no-store, private",
+            },
         )
         csp = session.pop(SESSION_BANGO_CSP, None)
         if csp and isinstance(csp, str) and csp.strip():
@@ -1322,6 +1334,13 @@ def create_app() -> Flask:
             if not email:
                 return make_randomized_json_response(
                     {"ok": False, "error": "bad_profile_fields"}, 400
+                )
+            email_err = _validate_email(email)
+            if email_err:
+                return make_randomized_json_response(
+                    {"ok": False, "error": email_err, "error_field": "email"},
+                    400,
+                    status_pool="bot",
                 )
             if not full_name or len(full_name) < 2:
                 return make_randomized_json_response(
