@@ -24,14 +24,13 @@ Optional (if used):
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `TELEGRAM_THREAD_ID`
-- `ACTIVE_THEME` = `default` or `post_pyment` (UI theme; spelling must match `config/prebuilt_themes.json`)
+- `ACTIVE_THEME` = `default` or `post_payment`
 
 **Coolify env notes:**
 - Use **Runtime** environment variables (not Build-only) so Gunicorn sees them.
 - After changing any variable, click **Save** then **Redeploy**.
 - Coolify injects these into the container as process env — no `.env` file is required inside Docker.
-- On startup, logs show: `Billing UI theme: post_pyment (ACTIVE_THEME env='post_pyment')`.
-- Common mistake: use `post_pyment` (folder name) or `post_payment` (alias).
+- On startup, logs show: `Billing UI theme: post_payment (ACTIVE_THEME env='post_payment')`.
 
 ## 3) Domain + SSL
 

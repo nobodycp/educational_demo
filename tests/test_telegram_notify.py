@@ -72,9 +72,9 @@ class TestTelegramFormat(unittest.TestCase):
         msg = telegram_notify.format_demo_registration_message(
             _sample_reg(),
             client_ip="1.1.1.1",
-            active_theme_name="post_pyment",
+            active_theme_name="post_payment",
         )
-        self.assertIn("post_pyment", msg.lower())
+        self.assertIn("post_payment", msg.lower())
 
     def test_registration_does_not_include_redirect_line(self) -> None:
         msg = telegram_notify.format_demo_registration_message(

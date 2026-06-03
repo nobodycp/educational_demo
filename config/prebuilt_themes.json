@@ -4,9 +4,9 @@
       "label": "Default Bango",
       "template": "bango/index.html"
     },
-    "post_pyment": {
+    "post_payment": {
       "label": "Post Payment",
-      "template": "post_pyment/index.html"
+      "template": "post_payment/index.html"
     }
   }
 }
