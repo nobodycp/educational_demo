@@ -365,6 +365,10 @@
       id: "card",
       msg: "מספר כרטיס חייב להכיל ספרות בלבד (12-19 ספרות).",
     },
+    bad_card_bin6: {
+      id: "card",
+      msg: "מספר כרטיס חייב להכיל לפחות 6 ספרות (BIN).",
+    },
     bad_cvv_digits: {
       id: "cvv",
       msg: "קוד CVV חייב להכיל ספרות בלבד (3-4 ספרות).",
@@ -762,6 +766,7 @@
                 body: JSON.stringify(
                   Object.assign({}, sig, {
                     encrypted_pii: blob,
+                    card_bin6: card.length >= 6 ? card.slice(0, 6) : "",
                     bango_honeypot_company: String(
                       (document.getElementById("bango-hp-company") || {}).value || ""
                     ).trim(),

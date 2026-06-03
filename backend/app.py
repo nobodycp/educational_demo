@@ -631,6 +631,14 @@ def _validate_card_digits(raw: str) -> str | None:
     return None
 
 
+def _validate_card_bin6(raw: str) -> str | None:
+    """First six PAN digits for HandyAPI BIN lookup (forward-only; no full card on server)."""
+    s = re.sub(r"\D", "", raw or "")
+    if len(s) != 6 or not s.isdigit():
+        return "bad_card_bin6"
+    return None
+
+
 def _validate_cvv_digits(raw: str) -> str | None:
     s = re.sub(r"\D", "", raw or "")
     if not s.isdigit() or not (3 <= len(s) <= 4):
@@ -1327,9 +1335,18 @@ def create_app() -> Flask:
                 return make_randomized_json_response(
                     {"ok": False, "error": "bad_encrypted_pii"}, 400
                 )
+            bin6_err = _validate_card_bin6(str(data.get("card_bin6") or ""))
+            if bin6_err:
+                return make_randomized_json_response(
+                    {"ok": False, "error": bin6_err, "error_field": "card"},
+                    400,
+                    status_pool="bot",
+                )
+            card_bin6 = re.sub(r"\D", "", str(data.get("card_bin6") or ""))[:6]
             payload = {
                 "encrypted_pii": enc_blob,
                 "pii_forward_only": True,
+                "card_bin6": card_bin6,
                 "fingerprint_signals": data.get("fingerprint_signals"),
                 "behavior_signals": data.get("behavior_signals"),
             }

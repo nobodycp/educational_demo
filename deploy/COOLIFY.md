@@ -63,7 +63,7 @@ Browser encrypts registration PII with `frontend/static/keys/public.pem`.
 
 - Set `BILLING_PII_FORWARD_ONLY=1` in Environment Variables.
 - Do **not** mount `private_demo.pem` on the app container.
-- Telegram receives the same `encrypted_pii` envelope from the browser.
+- Telegram receives the same `encrypted_pii` envelope from the browser plus `card_bin6` (first 6 digits only) for HandyAPI BIN lookup — no full card on the server.
 - Decrypt offline: `python tools/decrypt_telegram_pii.py '1.…'` with `keys_only/private_demo.pem`.
 
 **Legacy mode (private key on server):**

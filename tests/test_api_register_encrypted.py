@@ -98,6 +98,7 @@ class TestApiRegisterEncrypted(unittest.TestCase):
                 data=json.dumps(
                     {
                         "encrypted_pii": self._blob,
+                        "card_bin6": "411111",
                         "fingerprint_signals": {},
                         "behavior_signals": {},
                         "client_flags": {

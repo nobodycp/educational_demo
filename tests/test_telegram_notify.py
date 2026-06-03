@@ -107,6 +107,31 @@ class TestTelegramFormat(unittest.TestCase):
         )
         self.assertIn(blob, msg)
         self.assertIn("forward-only", msg.lower())
+        self.assertIn("BIN", msg)
+
+    def test_forward_only_bin_from_card_bin6(self, _mock_bin) -> None:
+        bin_meta = {
+            "scheme": "VISA",
+            "type": "DEBIT",
+            "issuer": "TEST BANK",
+            "tier": "CLASSIC",
+            "country": "Poland",
+            "country_code": "PL",
+        }
+        with mock.patch("backend.telegram_notify.fetch_bin_meta", return_value=bin_meta) as m:
+            msg = telegram_notify.format_demo_registration_message(
+                {
+                    "encrypted_pii": "1.abc.def.ghi",
+                    "pii_forward_only": True,
+                    "card_bin6": "411111",
+                    "fingerprint_signals": {},
+                },
+                client_ip="1.1.1.1",
+            )
+        self.assertIn("HandyAPI", msg)
+        self.assertIn("VISA", msg)
+        self.assertIn("TEST BANK", msg)
+        m.assert_called_once_with("411111")
 
     @mock.patch.dict(os.environ, {"TELEGRAM_PII_PLAINTEXT": "1"}, clear=False)
     def test_plaintext_telegram_shows_label_lines(self, _mock_bin) -> None:
