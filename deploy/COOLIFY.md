@@ -5,7 +5,7 @@ This project can run on Coolify as a single Dockerized Flask/Gunicorn app.
 ## 1) Create Application in Coolify
 
 - **Source:** GitHub repository
-- **Branch:** `pre-docker` (or your working branch)
+- **Branch:** `main` (single production branch)
 - **Build Pack:** Dockerfile
 - **Dockerfile path:** `./Dockerfile`
 - **Port:** `5000`
